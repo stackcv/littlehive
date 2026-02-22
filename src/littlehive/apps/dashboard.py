@@ -312,30 +312,30 @@ def build_dashboard(config_path: str | None, read_only: bool, admin_token_overri
     if token is None:
         token = os.getenv(runtime.cfg.admin_token_env, "")
     state = DashboardState(admin_token=token or "", read_only=read_only or bool(runtime.cfg.admin_read_only))
-    ui.colors(
-        primary="#14532D",
-        secondary="#1F2937",
-        accent="#0EA5E9",
-        dark="#0F172A",
-        positive="#16A34A",
-        negative="#DC2626",
-        warning="#D97706",
-        info="#0284C7",
-    )
-    ui.add_css(
-        """
-        body {
-            background: linear-gradient(180deg, #F8FAFC 0%, #ECFDF5 100%);
-        }
-        .q-card {
-            border-radius: 12px;
-            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
-        }
-        """
-    )
 
     @ui.page("/")
     def dashboard() -> None:
+        ui.colors(
+            primary="#14532D",
+            secondary="#1F2937",
+            accent="#0EA5E9",
+            dark="#0F172A",
+            positive="#16A34A",
+            negative="#DC2626",
+            warning="#D97706",
+            info="#0284C7",
+        )
+        ui.add_css(
+            """
+            body {
+                background: linear-gradient(180deg, #F8FAFC 0%, #ECFDF5 100%);
+            }
+            .q-card {
+                border-radius: 12px;
+                box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+            }
+            """
+        )
         with ui.column().classes("w-full max-w-[1200px] mx-auto p-4 gap-4"):
             ui.label("LittleHive Operator Dashboard").classes("text-2xl font-bold text-slate-800")
             with ui.tabs().classes("w-full") as tabs:
