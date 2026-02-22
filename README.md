@@ -24,7 +24,8 @@ pip install -e ".[dev,telegram,ui]"
 ## Quickstart
 1. Start LittleHive:
 ```bash
-littlehive-run
+lhive run
+# or: lh-run
 ```
 This will:
 - run **quick onboarding** on first launch (if config is missing),
@@ -34,12 +35,14 @@ This will:
 
 For full power-user onboarding prompts:
 ```bash
-littlehive-run --advanced
+lhive run --advanced
+# or: littlehive-run --advanced
 ```
 
 To reset local setup and start fresh:
 ```bash
-littlehive-reset
+lhive reset
+# or: lh-reset
 ```
 
 2. Optional diagnostics:
@@ -81,6 +84,9 @@ littlehive-diag --budget-stats
 ```
 
 ## CLI Entrypoints
+- `lhive` (short command: `lhive run`, `lhive reset`, `lhive diag`)
+- `lh-run` (short alias)
+- `lh-reset` (short alias)
 - `littlehive-run` (recommended for end users)
 - `littlehive-onboard`
 - `littlehive-api`

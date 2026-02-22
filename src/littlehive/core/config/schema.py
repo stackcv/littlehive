@@ -71,7 +71,7 @@ class ChannelsConfig(BaseModel):
 class AppConfig(BaseModel):
     instance: InstanceConfig = Field(default_factory=InstanceConfig)
     timezone: str = "Asia/Kolkata"
-    environment: str = "dev"
+    environment: str = "prod"
     runtime: RuntimeConfig = Field(default_factory=RuntimeConfig)
     context: ContextConfig = Field(default_factory=ContextConfig)
     telemetry: TelemetryConfig = Field(default_factory=TelemetryConfig)

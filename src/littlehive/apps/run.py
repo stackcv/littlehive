@@ -117,7 +117,7 @@ def _collect_quick_answers(config_path: Path, env_file: Path) -> tuple[Onboardin
     answers = OnboardingAnswers(
         instance_name=instance_name,
         timezone=timezone,
-        environment="dev",
+        environment="prod",
         config_path=str(config_path),
         env_path=str(env_file),
         enable_telegram=enable_telegram,

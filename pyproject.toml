@@ -55,6 +55,9 @@ littlehive-supervisor = "littlehive.apps.supervisor:main"
 littlehive-dashboard = "littlehive.apps.dashboard:main"
 littlehive-run = "littlehive.apps.run:main"
 littlehive-reset = "littlehive.apps.reset:main"
+lhive = "littlehive.apps.short_cli:main"
+lh-run = "littlehive.apps.run:main"
+lh-reset = "littlehive.apps.reset:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

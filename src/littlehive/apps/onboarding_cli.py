@@ -19,7 +19,7 @@ def main() -> int:
 
     parser.add_argument("--instance-name", default="littlehive-local")
     parser.add_argument("--timezone", default="Asia/Kolkata")
-    parser.add_argument("--environment", default="dev")
+    parser.add_argument("--environment", default="prod")
 
     parser.add_argument("--enable-telegram", action="store_true")
     parser.add_argument("--telegram-token-env", default="TELEGRAM_BOT_TOKEN")

@@ -7,7 +7,8 @@ pip install "littlehive[full]"
 
 ## Recommended Start
 ```bash
-littlehive-run
+lhive run
+# or: lh-run
 ```
 
 On first run this launches onboarding and generates:
@@ -18,12 +19,13 @@ Then it starts API, dashboard, supervisor, and Telegram worker if enabled.
 
 Use full onboarding prompts when needed:
 ```bash
-littlehive-run --advanced
+lhive run --advanced
 ```
 
 To wipe local setup and start over:
 ```bash
-littlehive-reset
+lhive reset
+# or: lh-reset
 ```
 
 ## Manual Generate Config

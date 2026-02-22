@@ -18,7 +18,7 @@ from littlehive.core.providers.health import ProviderCheckResult, check_configur
 class OnboardingAnswers:
     instance_name: str = "littlehive-local"
     timezone: str = "Asia/Kolkata"
-    environment: str = "dev"
+    environment: str = "prod"
     config_path: str = "config/instance.yaml"
     env_path: str = ".env"
     enable_telegram: bool = False
@@ -188,7 +188,7 @@ def collect_interactive_answers(input_func: Callable[[str], str], output_func: C
 
     instance_name = input_func("Instance name [littlehive-local]: ").strip() or "littlehive-local"
     timezone = input_func(f"Timezone [{tz_default}]: ").strip() or tz_default
-    environment = input_func("Environment [dev]: ").strip() or "dev"
+    environment = input_func("Environment [prod]: ").strip() or "prod"
     config_path = input_func("Config output path [config/instance.yaml]: ").strip() or "config/instance.yaml"
     env_path = input_func("Env output path [.env]: ").strip() or ".env"
 
