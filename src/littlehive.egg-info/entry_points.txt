@@ -1,0 +1,5 @@
+[console_scripts]
+littlehive-api = littlehive.apps.api_server:main
+littlehive-diag = littlehive.apps.diagnostics_cli:main
+littlehive-onboard = littlehive.apps.onboarding_cli:main
+littlehive-telegram = littlehive.apps.telegram_worker:main

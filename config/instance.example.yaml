@@ -1,0 +1,12 @@
+providers:
+  local_compatible:
+    enabled: false
+    base_url: http://localhost:8001/v1
+    api_key_env: LITTLEHIVE_LOCAL_PROVIDER_KEY
+  groq:
+    enabled: false
+    api_key_env: LITTLEHIVE_GROQ_API_KEY
+channels:
+  telegram:
+    enabled: false
+    token_env: LITTLEHIVE_TELEGRAM_TOKEN

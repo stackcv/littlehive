@@ -1,0 +1,18 @@
+instance:
+  name: littlehive
+timezone: Asia/Kolkata
+environment: dev
+runtime:
+  request_timeout_seconds: 30
+  max_steps: 8
+context:
+  recent_turns: 8
+  snippet_cap: 6
+  preflight_enabled: true
+telemetry:
+  log_level: INFO
+  json_logs: true
+database:
+  url: sqlite:///littlehive.db
+providers: {}
+channels: {}

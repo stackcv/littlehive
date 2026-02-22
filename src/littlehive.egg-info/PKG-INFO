@@ -1,0 +1,26 @@
+Metadata-Version: 2.4
+Name: littlehive
+Version: 0.1.0
+Summary: LittleHive local-first multi-agent assistant foundation
+Author: LittleHive
+License: MIT
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: pydantic>=2.6
+Requires-Dist: pydantic-settings>=2.1
+Requires-Dist: sqlalchemy>=2.0
+Requires-Dist: alembic>=1.13
+Requires-Dist: fastapi>=0.110
+Requires-Dist: httpx>=0.27
+Requires-Dist: tenacity>=8.2
+Requires-Dist: structlog>=24.1
+Requires-Dist: PyYAML>=6.0
+Provides-Extra: telegram
+Requires-Dist: python-telegram-bot>=21.0; extra == "telegram"
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.23; extra == "dev"
+
+# LittleHive
+
+Phase 0 foundation for LittleHive: package skeleton, architecture boundaries, config, DB, and observability wiring.
