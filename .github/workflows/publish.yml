@@ -1,0 +1,107 @@
+name: publish
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: "Target package index"
+        required: true
+        default: "pypi"
+        type: choice
+        options:
+          - pypi
+          - testpypi
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+
+      - name: Verify version matches tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          export TAG_VERSION="${GITHUB_REF_NAME#v}"
+          python - <<'PY'
+          import tomllib
+          import os
+          from pathlib import Path
+
+          tag_version = os.environ["TAG_VERSION"]
+          data = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+          project_version = data["project"]["version"]
+
+          if project_version != tag_version:
+              raise SystemExit(
+                  f"Version mismatch: tag=${tag_version} pyproject={project_version}"
+              )
+          print(f"Version check passed: {project_version}")
+          PY
+
+      - name: Build distributions
+        run: python -m build
+
+      - name: Validate package metadata
+        run: twine check dist/*
+
+      - name: Upload distribution artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+
+  publish-pypi:
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.repository == 'pypi')
+    needs: build-and-verify
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/littlehive
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+  publish-testpypi:
+    if: github.event_name == 'workflow_dispatch' && inputs.repository == 'testpypi'
+    needs: build-and-verify
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/littlehive
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
