@@ -27,6 +27,8 @@ jobs:
         run: python -m build
       - name: Run littlehive-run smoke
         run: python -m littlehive.apps.run --help
+      - name: Run littlehive-reset smoke
+        run: python -m littlehive.apps.reset --help
 
   package-smoke:
     runs-on: ubuntu-latest

@@ -27,10 +27,20 @@ pip install -e ".[dev,telegram,ui]"
 littlehive-run
 ```
 This will:
-- run onboarding on first launch (if config is missing),
+- run **quick onboarding** on first launch (if config is missing),
 - load `.env`,
 - start API, dashboard, supervisor, and Telegram worker (when enabled and token is present),
 - print the local dashboard URL.
+
+For full power-user onboarding prompts:
+```bash
+littlehive-run --advanced
+```
+
+To reset local setup and start fresh:
+```bash
+littlehive-reset
+```
 
 2. Optional diagnostics:
 ```bash
@@ -78,6 +88,7 @@ littlehive-diag --budget-stats
 - `littlehive-diag`
 - `littlehive-dashboard`
 - `littlehive-supervisor`
+- `littlehive-reset`
 
 ## Development
 ```bash

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -8,9 +9,13 @@ import time
 import webbrowser
 from pathlib import Path
 
+import yaml
+
 from littlehive.cli import base_parser
 from littlehive.core.config.loader import load_app_config
-from littlehive.core.config.onboarding import collect_interactive_answers, run_onboarding
+from littlehive.core.config.onboarding import OnboardingAnswers, collect_interactive_answers, parse_id_list, run_onboarding
+
+ENV_VAR_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 def _resolve_config_path(cli_config: str | None) -> Path:
@@ -61,20 +66,106 @@ def _upsert_env_file(path: Path, key: str, value: str) -> None:
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def _parse_yes_no(raw: str, *, default: bool) -> bool:
+    value = raw.strip().lower()
+    if not value:
+        return default
+    return value in {"y", "yes", "1", "true", "t"}
+
+
+def _collect_quick_answers(config_path: Path, env_file: Path) -> tuple[OnboardingAnswers, dict[str, str]]:
+    print("LittleHive quick setup")
+    print("Press Enter to accept defaults.")
+
+    tz_default = os.getenv("TZ", "Asia/Kolkata")
+    instance_name = input("Instance name [littlehive-local]: ").strip() or "littlehive-local"
+    timezone = input(f"Timezone [{tz_default}]: ").strip() or tz_default
+
+    enable_telegram = _parse_yes_no(input("Enable Telegram? [Y/n]: "), default=True)
+    telegram_token = ""
+    telegram_allowed_ids: list[int] = []
+    telegram_owner_id: int | None = None
+    if enable_telegram:
+        telegram_token = input("Telegram bot token (leave blank to disable Telegram): ").strip()
+        if not telegram_token:
+            enable_telegram = False
+            print("Telegram disabled because token was blank.")
+        else:
+            ids_raw = input("Your Telegram user ID (optional, comma-separated): ").strip()
+            telegram_allowed_ids = parse_id_list(ids_raw) if ids_raw else []
+            if telegram_allowed_ids:
+                telegram_owner_id = telegram_allowed_ids[0]
+
+    local_base_url = input("Local model server URL [http://localhost:8001/v1] (blank to disable local provider): ").strip()
+    enable_local_provider = True
+    if not local_base_url:
+        enable_local_provider = False
+        local_base_url = "http://localhost:8001/v1"
+
+    local_key = "none"
+    if enable_local_provider:
+        local_key = input("Local provider API key [none]: ").strip() or "none"
+
+    enable_groq = _parse_yes_no(input("Enable Groq fallback? [y/N]: "), default=False)
+    groq_key = ""
+    if enable_groq:
+        groq_key = input("Groq API key (leave blank to disable Groq): ").strip()
+        if not groq_key:
+            enable_groq = False
+            print("Groq disabled because API key was blank.")
+
+    answers = OnboardingAnswers(
+        instance_name=instance_name,
+        timezone=timezone,
+        environment="dev",
+        config_path=str(config_path),
+        env_path=str(env_file),
+        enable_telegram=enable_telegram,
+        telegram_token_env="TELEGRAM_BOT_TOKEN",
+        telegram_allowed_ids=telegram_allowed_ids,
+        telegram_owner_id=telegram_owner_id,
+        enable_local_provider=enable_local_provider,
+        local_base_url=local_base_url,
+        local_api_key_env="LITTLEHIVE_LOCAL_PROVIDER_KEY",
+        enable_groq=enable_groq,
+        groq_api_key_env="LITTLEHIVE_GROQ_API_KEY",
+        safe_mode=True,
+        max_steps=4,
+        step_timeout_seconds=30,
+        recent_turn_limit=4,
+        max_memory_snippets=4,
+    )
+
+    secrets: dict[str, str] = {}
+    if enable_telegram and telegram_token:
+        secrets["TELEGRAM_BOT_TOKEN"] = telegram_token
+    if enable_local_provider:
+        secrets["LITTLEHIVE_LOCAL_PROVIDER_KEY"] = local_key
+    if enable_groq and groq_key:
+        secrets["LITTLEHIVE_GROQ_API_KEY"] = groq_key
+
+    return answers, secrets
+
+
 def _run_onboarding_if_needed(
     config_path: Path,
     env_file: Path,
     *,
     force: bool,
     skip_provider_tests: bool,
+    advanced: bool,
 ) -> tuple[Path, Path]:
     if config_path.exists() and not force:
         return config_path, env_file
 
-    print("No runtime config found. Starting interactive onboarding.")
-    answers = collect_interactive_answers(input, print)
-    answers.config_path = str(config_path)
-    answers.env_path = str(env_file)
+    print("No runtime config found. Starting onboarding.")
+    if advanced:
+        answers = collect_interactive_answers(input, print)
+        answers.config_path = str(config_path)
+        answers.env_path = str(env_file)
+        secrets: dict[str, str] = {}
+    else:
+        answers, secrets = _collect_quick_answers(config_path, env_file)
 
     result = run_onboarding(
         answers=answers,
@@ -84,6 +175,12 @@ def _run_onboarding_if_needed(
         input_func=input,
         allow_no_provider_success=True,
     )
+
+    if secrets:
+        for key, value in secrets.items():
+            _upsert_env_file(env_file, key, value)
+        print(f"Saved {len(secrets)} credential(s) to {env_file}")
+
     print(f"Onboarding complete. config={result.config_path} env={result.env_path}")
     return Path(result.config_path), Path(result.env_path)
 
@@ -115,11 +212,44 @@ def _shutdown(children: list[tuple[str, subprocess.Popen]]) -> None:
             proc.kill()
 
 
+def _normalize_telegram_token_env(config_path: Path, env_file: Path, env: dict[str, str]) -> None:
+    try:
+        cfg = load_app_config(instance_path=config_path)
+    except Exception:
+        return
+
+    if not cfg.channels.telegram.enabled:
+        return
+
+    token_env = cfg.channels.telegram.token_env
+    if ENV_VAR_RE.match(token_env):
+        return
+
+    if ":" not in token_env:
+        return
+
+    fixed_env_name = "TELEGRAM_BOT_TOKEN"
+    token_value = token_env.strip()
+
+    raw = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+    raw.setdefault("channels", {}).setdefault("telegram", {})["token_env"] = fixed_env_name
+    config_path.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
+
+    _upsert_env_file(env_file, fixed_env_name, token_value)
+    env[fixed_env_name] = token_value
+
+    print(
+        "Detected Telegram token pasted in the env-var-name field during onboarding; "
+        "auto-corrected config to TELEGRAM_BOT_TOKEN."
+    )
+
+
 def main() -> int:
     parser = base_parser("littlehive-run", "LittleHive user-friendly orchestrator")
     parser.add_argument("--config", default=None, help="Config file path")
     parser.add_argument("--env-file", default=".env", help="Env file path")
     parser.add_argument("--force-onboard", action="store_true", help="Force onboarding even if config exists")
+    parser.add_argument("--advanced", action="store_true", help="Use full advanced onboarding questionnaire")
     parser.add_argument("--skip-provider-tests", action="store_true", help="Skip provider tests during onboarding")
 
     parser.add_argument("--no-api", action="store_true")
@@ -132,7 +262,7 @@ def main() -> int:
     parser.add_argument("--dashboard-host", default=None)
     parser.add_argument("--dashboard-port", type=int, default=None)
     parser.add_argument("--no-open-browser", action="store_true")
-    parser.add_argument("--supervisor-interval", type=int, default=5)
+    parser.add_argument("--supervisor-interval", type=int, default=30)
     args = parser.parse_args()
 
     config_path = _resolve_config_path(args.config)
@@ -144,6 +274,7 @@ def main() -> int:
             env_file,
             force=args.force_onboard,
             skip_provider_tests=args.skip_provider_tests,
+            advanced=args.advanced,
         )
     except KeyboardInterrupt:
         print("Onboarding cancelled.")
@@ -154,6 +285,8 @@ def main() -> int:
 
     env = _prepare_runtime_env(env_file)
     env["LITTLEHIVE_CONFIG_FILE"] = str(config_path)
+
+    _normalize_telegram_token_env(config_path, env_file, env)
 
     try:
         cfg = load_app_config(instance_path=config_path)

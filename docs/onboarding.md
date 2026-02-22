@@ -16,6 +16,16 @@ On first run this launches onboarding and generates:
 
 Then it starts API, dashboard, supervisor, and Telegram worker if enabled.
 
+Use full onboarding prompts when needed:
+```bash
+littlehive-run --advanced
+```
+
+To wipe local setup and start over:
+```bash
+littlehive-reset
+```
+
 ## Manual Generate Config
 ```bash
 littlehive-onboard

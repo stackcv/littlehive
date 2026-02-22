@@ -197,7 +197,9 @@ def collect_interactive_answers(input_func: Callable[[str], str], output_func: C
     telegram_allowed_ids: list[int] = []
     telegram_owner_id: int | None = None
     if enable_telegram:
-        telegram_token_env = input_func("Telegram token env var [TELEGRAM_BOT_TOKEN]: ").strip() or "TELEGRAM_BOT_TOKEN"
+        telegram_token_env = (
+            input_func("Telegram token environment variable name [TELEGRAM_BOT_TOKEN]: ").strip() or "TELEGRAM_BOT_TOKEN"
+        )
         ids_raw = input_func("Allowed Telegram user IDs (comma-separated): ")
         telegram_allowed_ids = parse_id_list(ids_raw)
         owner_raw = input_func("Owner Telegram user ID (optional): ").strip()
