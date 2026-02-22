@@ -1,11 +1,15 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import select
 
 from littlehive.db.models import Task, TaskStep
 from littlehive.core.tools.base import ToolCallContext, ToolMetadata
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 def register_task_tools(registry, db_session_factory):
@@ -17,8 +21,8 @@ def register_task_tools(registry, db_session_factory):
                 status="running",
                 summary=summary,
                 last_error="",
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
+                created_at=_utcnow(),
+                updated_at=_utcnow(),
             )
             db.add(task)
             db.flush()
@@ -33,7 +37,7 @@ def register_task_tools(registry, db_session_factory):
         with db_session_factory() as db:
             task = db.execute(select(Task).where(Task.id == task_id)).scalar_one()
             task.status = status
-            task.updated_at = datetime.utcnow()
+            task.updated_at = _utcnow()
             if "last_error" in args:
                 task.last_error = (args.get("last_error") or "")[:1000]
             step = TaskStep(
@@ -42,7 +46,7 @@ def register_task_tools(registry, db_session_factory):
                 agent_id=args.get("agent_id", "orchestrator_agent"),
                 status=status,
                 detail=detail,
-                created_at=datetime.utcnow(),
+                created_at=_utcnow(),
             )
             db.add(step)
             db.flush()
@@ -52,17 +56,27 @@ def register_task_tools(registry, db_session_factory):
     registry.register(
         ToolMetadata(
             name="task.create",
-            routing_summary="Create a task for session pipeline processing.",
-            invocation_summary="task.create(summary)",
+            version="2.0",
+            risk_level="low",
+            tags=["task", "lifecycle"],
+            routing_summary="Create task record for current request.",
+            invocation_summary="task.create(summary) returns task_id.",
             full_schema={"type": "object", "properties": {"summary": {"type": "string"}}},
+            examples=["task.create(summary='answer user request')"],
+            timeout_sec=8,
+            idempotent=False,
+            permission_required="none",
         ),
         task_create,
     )
     registry.register(
         ToolMetadata(
             name="task.update",
-            routing_summary="Update task status and record step.",
-            invocation_summary="task.update(task_id, status, step_index)",
+            version="2.0",
+            risk_level="low",
+            tags=["task", "lifecycle", "step"],
+            routing_summary="Update task status and append execution step.",
+            invocation_summary="task.update(task_id, status, step_index, detail).",
             full_schema={
                 "type": "object",
                 "properties": {
@@ -70,8 +84,14 @@ def register_task_tools(registry, db_session_factory):
                     "status": {"type": "string"},
                     "step_index": {"type": "integer"},
                     "detail": {"type": "string"},
+                    "last_error": {"type": "string"},
                 },
+                "required": ["task_id", "status"],
             },
+            examples=["task.update(task_id=1, status='completed', step_index=2, detail='reply ready')"],
+            timeout_sec=8,
+            idempotent=False,
+            permission_required="none",
         ),
         task_update,
     )

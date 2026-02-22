@@ -12,6 +12,13 @@ class RuntimeConfig(BaseModel):
     request_timeout_seconds: int = 30
     max_steps: int = 4
     retry_attempts: int = 2
+    provider_retry_attempts: int = 2
+    tool_retry_attempts: int = 2
+    provider_timeout_seconds: int = 20
+    breaker_failure_threshold: int = 3
+    breaker_cool_down_seconds: int = 25
+    reflexion_max_per_step: int = 1
+    reflexion_max_per_task: int = 2
 
 
 class ContextConfig(BaseModel):

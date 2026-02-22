@@ -12,6 +12,7 @@ src/littlehive/apps/__init__.py
 src/littlehive/apps/api_server.py
 src/littlehive/apps/diagnostics_cli.py
 src/littlehive/apps/onboarding_cli.py
+src/littlehive/apps/supervisor.py
 src/littlehive/apps/telegram_worker.py
 src/littlehive/channels/__init__.py
 src/littlehive/channels/telegram/__init__.py
@@ -63,17 +64,22 @@ src/littlehive/core/providers/openai_compatible.py
 src/littlehive/core/providers/router.py
 src/littlehive/core/runtime/__init__.py
 src/littlehive/core/runtime/circuit_breaker.py
+src/littlehive/core/runtime/errors.py
 src/littlehive/core/runtime/jobs.py
 src/littlehive/core/runtime/locks.py
+src/littlehive/core/runtime/recovery.py
 src/littlehive/core/runtime/retries.py
 src/littlehive/core/runtime/timeouts.py
 src/littlehive/core/telemetry/__init__.py
+src/littlehive/core/telemetry/diagnostics.py
 src/littlehive/core/telemetry/logging.py
 src/littlehive/core/telemetry/metrics.py
+src/littlehive/core/telemetry/summary.py
 src/littlehive/core/telemetry/tracing.py
 src/littlehive/core/tools/__init__.py
 src/littlehive/core/tools/base.py
 src/littlehive/core/tools/executor.py
+src/littlehive/core/tools/injection.py
 src/littlehive/core/tools/itr.py
 src/littlehive/core/tools/registry.py
 src/littlehive/core/tools/builtin/__init__.py
@@ -87,3 +93,5 @@ src/littlehive/db/session.py
 src/littlehive/db/migrations/env.py
 src/littlehive/db/migrations/versions/0001_phase0_init.py
 src/littlehive/db/migrations/versions/0002_phase1_runtime.py
+src/littlehive/db/migrations/versions/0003_phase2_optimization.py
+src/littlehive/db/migrations/versions/0004_phase3_resilience.py

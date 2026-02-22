@@ -40,7 +40,8 @@ def test_provider_router_fallback_to_second_provider():
     )
 
     assert response.output_text == "ok"
-    assert calls == [("p1", "error"), ("p2", "ok")]
+    assert calls[-1] == ("p2", "ok")
+    assert any(provider == "p1" and status in {"error", "retry_error_2"} for provider, status in calls)
 
 
 def test_provider_router_raises_when_all_fail():

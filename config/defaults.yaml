@@ -7,6 +7,13 @@ runtime:
   request_timeout_seconds: 30
   max_steps: 4
   retry_attempts: 2
+  provider_retry_attempts: 2
+  tool_retry_attempts: 2
+  provider_timeout_seconds: 20
+  breaker_failure_threshold: 3
+  breaker_cool_down_seconds: 25
+  reflexion_max_per_step: 1
+  reflexion_max_per_task: 2
 context:
   recent_turns: 4
   snippet_cap: 4

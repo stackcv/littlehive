@@ -36,6 +36,7 @@ littlehive-onboard = "littlehive.apps.onboarding_cli:main"
 littlehive-api = "littlehive.apps.api_server:main"
 littlehive-telegram = "littlehive.apps.telegram_worker:main"
 littlehive-diag = "littlehive.apps.diagnostics_cli:main"
+littlehive-supervisor = "littlehive.apps.supervisor:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

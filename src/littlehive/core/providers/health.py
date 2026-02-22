@@ -22,6 +22,10 @@ def provider_health_summary(router: ProviderRouter) -> dict[str, bool]:
     return router.health()
 
 
+def provider_detailed_summary(router: ProviderRouter) -> dict[str, dict]:
+    return router.provider_status()
+
+
 def check_configured_providers(cfg: AppConfig, skip_tests: bool = False, timeout_seconds: float = 4.0) -> dict[str, ProviderCheckResult]:
     results: dict[str, ProviderCheckResult] = {}
 

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from littlehive.channels.telegram.adapter import build_telegram_runtime
 from littlehive.cli import base_parser
 from littlehive.core.config.hardware_audit import collect_hardware_audit, render_hardware_summary
 from littlehive.core.config.loader import load_app_config
 from littlehive.core.config.recommender import recommend_models
 from littlehive.core.providers.health import check_configured_providers
+from littlehive.core.telemetry.diagnostics import budget_stats, failure_summary, runtime_stats
 
 
 def main() -> int:
@@ -15,17 +17,35 @@ def main() -> int:
     parser.add_argument("--check-providers", action="store_true")
     parser.add_argument("--recommend-models", action="store_true")
     parser.add_argument("--skip-provider-tests", action="store_true")
+
+    parser.add_argument("--provider-health", action="store_true")
+    parser.add_argument("--failures", action="store_true")
+    parser.add_argument("--runtime-stats", action="store_true")
+    parser.add_argument("--budget-stats", action="store_true")
+    parser.add_argument("--supervisor-status", action="store_true")
     args = parser.parse_args()
 
     did_work = False
     cfg = None
 
-    if args.validate_config or args.check_providers or args.recommend_models:
+    needs_cfg = any(
+        [
+            args.validate_config,
+            args.check_providers,
+            args.recommend_models,
+            args.provider_health,
+            args.failures,
+            args.runtime_stats,
+            args.budget_stats,
+        ]
+    )
+
+    if needs_cfg:
         try:
             cfg = load_app_config(instance_path=args.config)
             if args.validate_config:
                 did_work = True
-                print(f"config-valid instance={cfg.instance.name} env={cfg.environment}")
+                print(f"config-valid instance={cfg.instance.name} env={cfg.environment} safe_mode={cfg.runtime.safe_mode}")
         except Exception as exc:  # noqa: BLE001
             print(f"config-invalid error={exc}")
             return 1
@@ -69,8 +89,58 @@ def main() -> int:
         if rec.notes:
             print(f"- notes={rec.notes}")
 
+    runtime = None
+    if args.provider_health or args.failures or args.runtime_stats or args.budget_stats:
+        did_work = True
+        runtime = build_telegram_runtime(config_path=args.config)
+
+    if args.provider_health and runtime is not None:
+        print("provider-health:")
+        details = runtime.pipeline.provider_router.provider_status()
+        scores = runtime.pipeline.provider_router.provider_scores()
+        for name in sorted(details):
+            d = details[name]
+            print(
+                f"- {name}: health={d['health']} score={scores.get(name)} "
+                f"breaker={d['breaker']['state']} failures={d['stats'].get('failure', 0)} "
+                f"latency_ms={d['stats'].get('latency_ms', 0.0)}"
+            )
+
+    if args.failures and runtime is not None:
+        print("failure-summary:")
+        rows = failure_summary(runtime.db_session_factory, limit=10)
+        if not rows:
+            print("- none")
+        for row in rows:
+            print(
+                f"- {row['category']}:{row['component']} type={row['error_type']} "
+                f"count={row['count']} recovered={row['recovered']} last_strategy={row['last_strategy']}"
+            )
+
+    if args.runtime_stats and runtime is not None:
+        print("runtime-stats:")
+        st = runtime_stats(runtime.db_session_factory)
+        print(f"- tasks_by_status={st['tasks_by_status']}")
+        print(f"- trace_summaries={st['trace_summaries']}")
+        print(f"- safe_mode={cfg.runtime.safe_mode}")
+
+    if args.budget_stats and runtime is not None:
+        print("budget-stats:")
+        b = budget_stats(runtime.db_session_factory)
+        print(f"- avg_estimated_prompt_tokens={b['avg_estimated_prompt_tokens']}")
+        print(f"- trim_event_count={b['trim_event_count']}")
+        print(f"- over_budget_incidents={b['over_budget_incidents']}")
+        print(f"- trace_count={b['trace_count']}")
+
+    if args.supervisor_status:
+        did_work = True
+        print("supervisor-status: available (use littlehive-supervisor --once)")
+
     if not did_work:
-        print("diag-ready (use --validate-config/--hardware/--check-providers/--recommend-models)")
+        print(
+            "diag-ready (use --validate-config/--hardware/--check-providers/--recommend-models "
+            "--provider-health/--failures/--runtime-stats/--budget-stats)"
+        )
     return 0
 
 

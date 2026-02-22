@@ -24,9 +24,16 @@ def register_status_tools(registry, db_session_factory, provider_router):
     registry.register(
         ToolMetadata(
             name="status.get",
-            routing_summary="Get runtime and persistence status.",
-            invocation_summary="status.get()",
+            version="2.0",
+            risk_level="low",
+            tags=["status", "health", "diagnostics"],
+            routing_summary="Return runtime health and persistence counters.",
+            invocation_summary="status.get() returns counts and provider status.",
             full_schema={"type": "object", "properties": {}},
+            examples=["status.get()"],
+            timeout_sec=5,
+            idempotent=True,
+            permission_required="none",
         ),
         status_get,
     )

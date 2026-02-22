@@ -3,13 +3,21 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
+from pydantic import BaseModel, Field
 
-@dataclass(slots=True)
-class ToolMetadata:
+
+class ToolMetadata(BaseModel):
     name: str
+    version: str = "1.0"
+    risk_level: str = "low"
+    tags: list[str] = Field(default_factory=list)
     routing_summary: str
     invocation_summary: str
     full_schema: dict[str, Any]
+    examples: list[str] = Field(default_factory=list)
+    timeout_sec: int = 15
+    idempotent: bool = True
+    permission_required: str = "none"
 
 
 @dataclass(slots=True)
