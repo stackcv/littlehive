@@ -244,6 +244,15 @@ def _normalize_telegram_token_env(config_path: Path, env_file: Path, env: dict[s
     )
 
 
+def _normalize_legacy_environment(config_path: Path) -> None:
+    raw = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+    current = str(raw.get("environment", "")).strip().lower()
+    if current == "dev":
+        raw["environment"] = "prod"
+        config_path.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
+        print("Detected legacy environment=dev; updated config environment to prod.")
+
+
 def main() -> int:
     parser = base_parser("littlehive-run", "LittleHive user-friendly orchestrator")
     parser.add_argument("--config", default=None, help="Config file path")
@@ -255,6 +264,7 @@ def main() -> int:
     parser.add_argument("--no-api", action="store_true")
     parser.add_argument("--no-dashboard", action="store_true")
     parser.add_argument("--no-telegram", action="store_true")
+    parser.add_argument("--with-supervisor", action="store_true", help="Start supervisor heartbeat process")
     parser.add_argument("--no-supervisor", action="store_true")
 
     parser.add_argument("--api-host", default="127.0.0.1")
@@ -286,6 +296,7 @@ def main() -> int:
     env = _prepare_runtime_env(env_file)
     env["LITTLEHIVE_CONFIG_FILE"] = str(config_path)
 
+    _normalize_legacy_environment(config_path)
     _normalize_telegram_token_env(config_path, env_file, env)
 
     try:
@@ -299,7 +310,7 @@ def main() -> int:
 
     start_api = not args.no_api
     start_dashboard = not args.no_dashboard
-    start_supervisor = not args.no_supervisor
+    start_supervisor = bool(args.with_supervisor and not args.no_supervisor)
 
     start_telegram = False
     if not args.no_telegram and cfg.channels.telegram.enabled:

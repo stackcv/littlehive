@@ -20,21 +20,36 @@ def _build_table(columns: list[dict], rows: list[dict]) -> None:
     ui.table(columns=columns, rows=rows, row_key=columns[0]["name"]).classes("w-full")
 
 
+def _format_uptime(seconds: int) -> str:
+    if seconds < 60:
+        return f"{seconds}s"
+    minutes = seconds // 60
+    if minutes < 60:
+        return f"{minutes}m"
+    hours = minutes // 60
+    rem_minutes = minutes % 60
+    return f"{hours}h {rem_minutes}m"
+
+
 def _render_overview(runtime) -> None:
     overview = runtime.admin_service.overview()
+    is_prod = str(runtime.cfg.environment).strip().lower() == "prod"
+    overview_items = [
+        ("version", overview["version"]),
+        ("instance", overview["instance"]),
+        ("active_tasks", overview["active_tasks"]),
+        ("total_tasks", overview["total_tasks"]),
+        ("uptime", _format_uptime(int(overview["uptime_seconds"]))),
+    ]
+    if not is_prod:
+        overview_items.insert(2, ("environment", overview["environment"]))
+        overview_items.insert(3, ("safe_mode", overview["safe_mode"]))
+
     with ui.row().classes("w-full"):
-        for key in [
-            "version",
-            "instance",
-            "environment",
-            "safe_mode",
-            "active_tasks",
-            "total_tasks",
-            "uptime_seconds",
-        ]:
+        for key, value in overview_items:
             with ui.card().classes("min-w-[150px]"):
                 ui.label(key.replace("_", " ").title()).classes("text-xs text-gray-500")
-                ui.label(str(overview[key])).classes("text-lg")
+                ui.label(str(value)).classes("text-lg")
 
 
 def _render_providers(runtime) -> None:
@@ -108,7 +123,6 @@ def _render_memory(runtime) -> None:
 def _render_permissions(runtime, state: DashboardState) -> None:
     row = runtime.admin_service.get_or_create_permission_state()
     ui.label(f"Current profile: {row.current_profile}")
-    ui.label(f"Safe mode: {runtime.cfg.runtime.safe_mode}")
     ui.label(f"Read-only mode: {state.read_only}")
 
     profile_select = ui.select(
@@ -146,6 +160,11 @@ def _render_usage(runtime) -> None:
 
 
 def _render_failures(runtime) -> None:
+    is_prod = str(runtime.cfg.environment).strip().lower() == "prod"
+    if not is_prod:
+        ui.label(f"Environment: {runtime.cfg.environment}")
+        ui.label(f"Safe mode: {runtime.cfg.runtime.safe_mode}")
+
     rows = runtime.admin_service.failure_summary(limit=30)
     _build_table(
         [

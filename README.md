@@ -30,7 +30,8 @@ lhive run
 This will:
 - run **quick onboarding** on first launch (if config is missing),
 - load `.env`,
-- start API, dashboard, supervisor, and Telegram worker (when enabled and token is present),
+- start API, dashboard, and Telegram worker (when enabled and token is present),
+- keep supervisor off by default to reduce console noise,
 - print the local dashboard URL.
 
 For full power-user onboarding prompts:

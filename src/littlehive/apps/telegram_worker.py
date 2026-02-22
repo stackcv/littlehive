@@ -41,6 +41,8 @@ async def _run_polling(config_path: str | None) -> int:
     try:
         while True:
             await asyncio.sleep(1)
+    except (asyncio.CancelledError, KeyboardInterrupt):
+        return 130
     finally:
         await app.updater.stop()
         await app.stop()
@@ -62,7 +64,10 @@ def main() -> int:
         )
         return 0
 
-    return asyncio.run(_run_polling(args.config))
+    try:
+        return asyncio.run(_run_polling(args.config))
+    except KeyboardInterrupt:
+        return 130
 
 
 if __name__ == "__main__":

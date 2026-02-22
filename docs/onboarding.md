@@ -15,7 +15,7 @@ On first run this launches onboarding and generates:
 - `config/instance.yaml` (no secrets)
 - `.env` (env var placeholders and saved token values you provide)
 
-Then it starts API, dashboard, supervisor, and Telegram worker if enabled.
+Then it starts API, dashboard, and Telegram worker if enabled. Supervisor stays off by default.
 
 Use full onboarding prompts when needed:
 ```bash
