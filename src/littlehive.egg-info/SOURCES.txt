@@ -27,10 +27,12 @@ src/littlehive/core/agents/orchestrator_agent.py
 src/littlehive/core/agents/planner_agent.py
 src/littlehive/core/agents/reply_agent.py
 src/littlehive/core/config/__init__.py
+src/littlehive/core/config/benchmarks.py
 src/littlehive/core/config/defaults.py
 src/littlehive/core/config/hardware_audit.py
 src/littlehive/core/config/loader.py
 src/littlehive/core/config/onboarding.py
+src/littlehive/core/config/recommender.py
 src/littlehive/core/config/schema.py
 src/littlehive/core/context/__init__.py
 src/littlehive/core/context/budget.py
@@ -84,3 +86,4 @@ src/littlehive/db/models.py
 src/littlehive/db/session.py
 src/littlehive/db/migrations/env.py
 src/littlehive/db/migrations/versions/0001_phase0_init.py
+src/littlehive/db/migrations/versions/0002_phase1_runtime.py

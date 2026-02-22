@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from littlehive.core.context.token_estimator import TokenEstimator
 
@@ -15,12 +15,17 @@ class TokenBudget:
 class PreflightResult:
     allowed: bool
     estimated_input_tokens: int
+    trim_actions: list[str] = field(default_factory=list)
 
 
 class TokenBudgetPreflight:
     def __init__(self) -> None:
         self.estimator = TokenEstimator()
 
-    def check(self, compiled_text: str, budget: TokenBudget) -> PreflightResult:
+    def check(self, compiled_text: str, budget: TokenBudget, trim_actions: list[str] | None = None) -> PreflightResult:
         est = self.estimator.estimate(compiled_text)
-        return PreflightResult(allowed=est <= budget.max_input_tokens, estimated_input_tokens=est)
+        return PreflightResult(
+            allowed=est <= budget.max_input_tokens,
+            estimated_input_tokens=est,
+            trim_actions=trim_actions or [],
+        )

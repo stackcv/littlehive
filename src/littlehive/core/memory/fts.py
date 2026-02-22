@@ -1,1 +1,1 @@
-"""Memory module stub."""
+"""Full-text memory search placeholder."""

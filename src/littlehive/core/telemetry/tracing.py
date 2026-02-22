@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass
 from typing import Any
+
+_TRACE_EVENTS: deque[dict[str, Any]] = deque(maxlen=500)
 
 
 @dataclass(slots=True)
@@ -24,4 +27,12 @@ def trace_event(logger, ctx: TraceContext, event: str, status: str, extra: dict[
     }
     if extra:
         payload.update(extra)
+    _TRACE_EVENTS.append({"event": event, **payload})
     logger.info(event, **payload)
+
+
+def recent_traces(session_id: str | None = None, limit: int = 20) -> list[dict[str, Any]]:
+    items = list(_TRACE_EVENTS)
+    if session_id is not None:
+        items = [i for i in items if i.get("session_id") == session_id]
+    return items[-limit:]

@@ -1,1 +1,1 @@
-"""Runtime module stub."""
+"""Job orchestration placeholder for future scheduled/background work."""

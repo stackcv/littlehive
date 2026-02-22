@@ -1,8 +1,5 @@
-from littlehive.core.agents.base import Agent
+"""PlannerAgent remains intentionally minimal in Phase 1."""
 
 
-class PlannerAgent(Agent):
+class PlannerAgent:
     agent_id = "planner_agent"
-
-    def run(self, payload: dict) -> dict:
-        return payload

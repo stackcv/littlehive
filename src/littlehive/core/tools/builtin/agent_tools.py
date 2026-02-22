@@ -1,1 +1,1 @@
-"""Built-in tool stub."""
+"""Reserved for future cross-agent helper tools."""

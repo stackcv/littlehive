@@ -1,1 +1,1 @@
-"""Runtime module stub."""
+"""Circuit breaker placeholder."""

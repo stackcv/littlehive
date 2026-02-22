@@ -1,1 +1,32 @@
-"""Built-in tool stub."""
+from __future__ import annotations
+
+from sqlalchemy import func, select
+
+from littlehive.db.models import MemoryRecord, ProviderCall, Task
+from littlehive.core.tools.base import ToolCallContext, ToolMetadata
+
+
+def register_status_tools(registry, db_session_factory, provider_router):
+    def status_get(ctx: ToolCallContext, args: dict) -> dict:
+        _ = args
+        with db_session_factory() as db:
+            task_count = db.execute(select(func.count(Task.id))).scalar_one()
+            memory_count = db.execute(select(func.count(MemoryRecord.id))).scalar_one()
+            provider_count = db.execute(select(func.count(ProviderCall.id))).scalar_one()
+        return {
+            "session_id": ctx.session_db_id,
+            "tasks": int(task_count),
+            "memories": int(memory_count),
+            "provider_calls": int(provider_count),
+            "providers": provider_router.health(),
+        }
+
+    registry.register(
+        ToolMetadata(
+            name="status.get",
+            routing_summary="Get runtime and persistence status.",
+            invocation_summary="status.get()",
+            full_schema={"type": "object", "properties": {}},
+        ),
+        status_get,
+    )

@@ -3,16 +3,42 @@ instance:
 timezone: Asia/Kolkata
 environment: dev
 runtime:
+  safe_mode: true
   request_timeout_seconds: 30
-  max_steps: 8
+  max_steps: 4
+  retry_attempts: 2
 context:
-  recent_turns: 8
-  snippet_cap: 6
+  recent_turns: 4
+  snippet_cap: 4
   preflight_enabled: true
+  max_input_tokens: 1200
+  reserved_output_tokens: 256
+  memory_top_k: 3
 telemetry:
   log_level: INFO
   json_logs: true
 database:
   url: sqlite:///littlehive.db
-providers: {}
-channels: {}
+providers:
+  primary: local_compatible
+  fallback_order: [local_compatible, groq]
+  local_compatible:
+    enabled: false
+    base_url: http://localhost:8001/v1
+    api_key_env: LITTLEHIVE_LOCAL_PROVIDER_KEY
+    model: llama3.1:8b
+    models: [llama3.1:8b]
+    timeout_seconds: 20
+  groq:
+    enabled: false
+    api_key_env: LITTLEHIVE_GROQ_API_KEY
+    model: llama-3.1-8b-instant
+    models: [llama-3.1-8b-instant]
+    timeout_seconds: 20
+channels:
+  telegram:
+    enabled: false
+    token_env: LITTLEHIVE_TELEGRAM_TOKEN
+    owner_user_id: null
+    allow_user_ids: []
+    polling_timeout_seconds: 30
