@@ -53,6 +53,7 @@ littlehive-telegram = "littlehive.apps.telegram_worker:main"
 littlehive-diag = "littlehive.apps.diagnostics_cli:main"
 littlehive-supervisor = "littlehive.apps.supervisor:main"
 littlehive-dashboard = "littlehive.apps.dashboard:main"
+littlehive-run = "littlehive.apps.run:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

@@ -5,7 +5,18 @@
 pip install "littlehive[full]"
 ```
 
-## Generate Config
+## Recommended Start
+```bash
+littlehive-run
+```
+
+On first run this launches onboarding and generates:
+- `config/instance.yaml` (no secrets)
+- `.env` (env var placeholders and saved token values you provide)
+
+Then it starts API, dashboard, supervisor, and Telegram worker if enabled.
+
+## Manual Generate Config
 ```bash
 littlehive-onboard
 ```

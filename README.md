@@ -22,26 +22,22 @@ pip install -e ".[dev,telegram,ui]"
 ```
 
 ## Quickstart
-1. Initialize config/env:
+1. Start LittleHive:
 ```bash
-littlehive-onboard
+littlehive-run
 ```
-2. Validate config/hardware/providers:
+This will:
+- run onboarding on first launch (if config is missing),
+- load `.env`,
+- start API, dashboard, supervisor, and Telegram worker (when enabled and token is present),
+- print the local dashboard URL.
+
+2. Optional diagnostics:
 ```bash
 littlehive-diag --validate-config --hardware --check-providers
 ```
-3. Start Telegram worker:
-```bash
-littlehive-telegram --config config/instance.yaml
-```
-4. Start admin API:
-```bash
-littlehive-api --config config/instance.yaml --host 127.0.0.1 --port 8080
-```
-5. Start Python dashboard (NiceGUI):
-```bash
-littlehive-dashboard --config config/instance.yaml --host 127.0.0.1 --port 8666
-```
+
+Advanced/manual control CLIs are still available (see below).
 
 ## Dashboard
 `littlehive-dashboard` is Python-only (NiceGUI), no Node/React install required.
@@ -75,6 +71,7 @@ littlehive-diag --budget-stats
 ```
 
 ## CLI Entrypoints
+- `littlehive-run` (recommended for end users)
 - `littlehive-onboard`
 - `littlehive-api`
 - `littlehive-telegram`
