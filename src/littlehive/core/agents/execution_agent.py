@@ -23,6 +23,24 @@ class ExecutionAgent:
         self.tool_registry = tool_registry
         self.tool_executor = tool_executor
 
+    @staticmethod
+    def _is_remember_intent(text: str) -> bool:
+        return any(k in text for k in ["remember that", "remember ", "my timezone is", "my time zone is", "note that"])
+
+    @staticmethod
+    def _is_recall_intent(text: str) -> bool:
+        return any(
+            k in text
+            for k in [
+                "what is my",
+                "what's my",
+                "do you remember",
+                "recall",
+                "what did i",
+                "did i tell you",
+            ]
+        )
+
     def execute_from_transfer(self, transfer: Transfer, ctx: ToolCallContext) -> ExecutionResult:
         routing_bundle = build_tool_docs_bundle(
             registry=self.tool_registry,
@@ -34,14 +52,30 @@ class ExecutionAgent:
 
         selected: list[str] = []
         text = transfer.input_summary.lower()
+
+        # Intent-first routing: avoid noisy memory.search on write-intent turns.
+        if self._is_remember_intent(text):
+            selected = ["memory.write"]
+        elif self._is_recall_intent(text):
+            selected = ["memory.search"]
+
         for item in routing_bundle.routing:
             n = item["name"]
             if n.startswith("memory") and any(k in text for k in ["remember", "preference", "memory", "fix"]):
-                selected.append(n)
+                if n not in selected:
+                    selected.append(n)
             if n == "status.get" and "status" in text:
-                selected.append(n)
+                if n not in selected:
+                    selected.append(n)
             if n.startswith("task.") and "task" in text:
-                selected.append(n)
+                if n not in selected:
+                    selected.append(n)
+
+        # If we are writing memory, keep tool path focused to reduce wrong-context replies.
+        if selected and selected[0] == "memory.write":
+            selected = ["memory.write"]
+        if selected and selected[0] == "memory.search":
+            selected = ["memory.search"]
 
         if not selected and routing_bundle.routing:
             selected = [routing_bundle.routing[0]["name"]]
