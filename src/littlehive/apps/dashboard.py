@@ -266,7 +266,11 @@ def main() -> int:
 
     host = args.host or runtime.cfg.dashboard_host
     port = args.port or runtime.cfg.dashboard_port
-    ui.run(host=host, port=port, reload=False, title="LittleHive Dashboard")
+    try:
+        ui.run(host=host, port=port, reload=False, title="LittleHive Dashboard")
+    except KeyboardInterrupt:
+        # Graceful shutdown when parent orchestrator sends Ctrl+C.
+        return 130
     return 0
 
 

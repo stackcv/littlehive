@@ -21,6 +21,12 @@ def _normalize_message(message: str, max_len: int = 180) -> str:
     return msg.strip()[:max_len]
 
 
+def _compact_message(message: str, max_len: int = 220) -> str:
+    msg = message.lower()
+    msg = re.sub(r"\s+", " ", msg)
+    return msg.strip()[:max_len]
+
+
 def classify_error(exc: Exception, *, category: str, component: str) -> ErrorInfo:
     name = exc.__class__.__name__.lower()
     msg = str(exc)
@@ -51,4 +57,4 @@ def classify_error(exc: Exception, *, category: str, component: str) -> ErrorInf
 
 
 def compact_error_summary(exc: Exception, max_len: int = 220) -> str:
-    return f"{exc.__class__.__name__}: {_normalize_message(str(exc), max_len=max_len)}"
+    return f"{exc.__class__.__name__}: {_compact_message(str(exc), max_len=max_len)}"

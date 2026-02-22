@@ -110,12 +110,19 @@ def build_telegram_runtime(config_path: str | None = None) -> TelegramRuntime:
                 base_url=local_cfg.base_url,
                 api_key_env=local_cfg.api_key_env,
                 timeout_seconds=local_cfg.timeout_seconds,
+                default_model=local_cfg.model,
             )
         )
 
     groq_cfg = cfg.providers.groq
     if groq_cfg.enabled and groq_cfg.api_key_env and os.getenv(groq_cfg.api_key_env):
-        router.register(GroqAdapter(api_key_env=groq_cfg.api_key_env, timeout_seconds=groq_cfg.timeout_seconds))
+        router.register(
+            GroqAdapter(
+                api_key_env=groq_cfg.api_key_env,
+                timeout_seconds=groq_cfg.timeout_seconds,
+                default_model=groq_cfg.model,
+            )
+        )
 
     registry = ToolRegistry()
     register_memory_tools(registry, session_factory)

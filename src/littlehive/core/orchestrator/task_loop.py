@@ -70,6 +70,20 @@ class TaskPipeline:
         self.execution = ExecutionAgent(tool_executor.registry, tool_executor)
         self.reply_agent = ReplyAgent()
 
+    def _default_model(self) -> str:
+        preferred = (self.cfg.providers.primary or "").strip()
+        if preferred == "groq":
+            if self.cfg.providers.groq.model:
+                return self.cfg.providers.groq.model
+            if self.cfg.providers.local_compatible.model:
+                return self.cfg.providers.local_compatible.model
+        else:
+            if self.cfg.providers.local_compatible.model:
+                return self.cfg.providers.local_compatible.model
+            if self.cfg.providers.groq.model:
+                return self.cfg.providers.groq.model
+        return "llama3.1:8b"
+
     def ensure_user_session(self, telegram_user_id: int, chat_id: int) -> tuple[int, int]:
         with self.db_session_factory() as db:
             user = db.execute(select(User).where(User.telegram_user_id == telegram_user_id)).scalar_one_or_none()
@@ -329,7 +343,7 @@ class TaskPipeline:
                 raise RuntimeError("reply_context_over_budget")
 
             provider_request = ProviderRequest(
-                model=self.cfg.providers.local_compatible.model or "llama3.1:8b",
+                model=self._default_model(),
                 prompt=reply_compiled.prompt_text,
                 max_output_tokens=self.cfg.context.reserved_output_tokens,
             )
