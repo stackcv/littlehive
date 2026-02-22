@@ -1,8 +1,9 @@
 # PyPI Release (CI/CD via GitHub Actions)
 
-This repository uses a dedicated publish workflow:
+This repository uses dedicated release workflows:
 - CI (tests/lint/build smoke): `.github/workflows/ci.yml`
 - CD (publish package): `.github/workflows/publish.yml`
+- GitHub Release (notes + attached dist artifacts): `.github/workflows/release.yml`
 
 ## 1) One-time setup
 
@@ -35,11 +36,12 @@ No PyPI API token secret is needed when using Trusted Publisher.
 3. Create and push tag matching version:
 
 ```bash
-git tag v0.5.0
-git push origin v0.5.0
+git tag v0.5.1
+git push origin v0.5.1
 ```
 
 4. GitHub Actions `publish` workflow builds, checks, and uploads to PyPI.
+5. GitHub Actions `release` workflow creates a GitHub Release from the same tag and attaches wheel/sdist artifacts.
 
 ## 3) Manual publish options
 

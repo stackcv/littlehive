@@ -1,0 +1,62 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+
+      - name: Verify version matches tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          export TAG_VERSION="${GITHUB_REF_NAME#v}"
+          python - <<'PY'
+          import os
+          import tomllib
+          from pathlib import Path
+
+          tag_version = os.environ["TAG_VERSION"]
+          data = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+          project_version = data["project"]["version"]
+
+          if project_version != tag_version:
+              raise SystemExit(
+                  f"Version mismatch: tag={tag_version} pyproject={project_version}"
+              )
+          print(f"Version check passed: {project_version}")
+          PY
+
+      - name: Build distributions
+        run: python -m build
+
+      - name: Validate package metadata
+        run: twine check dist/*
+
+      - name: Create GitHub release and upload artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            dist/*

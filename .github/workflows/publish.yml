@@ -53,7 +53,7 @@ jobs:
 
           if project_version != tag_version:
               raise SystemExit(
-                  f"Version mismatch: tag=${tag_version} pyproject={project_version}"
+                  f"Version mismatch: tag={tag_version} pyproject={project_version}"
               )
           print(f"Version check passed: {project_version}")
           PY

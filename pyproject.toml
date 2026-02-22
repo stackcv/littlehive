@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "littlehive"
-version = "0.5.0"
+version = "0.5.1"
 description = "LittleHive local-first multi-agent assistant foundation"
 readme = "README.md"
 requires-python = ">=3.11"
