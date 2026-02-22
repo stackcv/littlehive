@@ -16,6 +16,16 @@ class DashboardState:
     read_only: bool
 
 
+def _permission_profile_descriptions() -> list[tuple[str, str]]:
+    return [
+        ("read_only", "No tool execution. Inspect status and memory only."),
+        ("assist_only", "Only low-risk assistant actions are allowed."),
+        ("execute_safe", "Low-risk allowed. Medium-risk requires confirmation. High/critical blocked."),
+        ("execute_with_confirmation", "Medium/high actions allowed with confirmation. Critical still blocked in safe mode."),
+        ("full_trusted", "All non-blocked actions allowed; only safe mode blocks critical risk."),
+    ]
+
+
 def _build_table(columns: list[dict], rows: list[dict]) -> None:
     ui.table(columns=columns, rows=rows, row_key=columns[0]["name"]).classes("w-full")
 
@@ -123,7 +133,12 @@ def _render_memory(runtime) -> None:
 def _render_permissions(runtime, state: DashboardState) -> None:
     row = runtime.admin_service.get_or_create_permission_state()
     ui.label(f"Current profile: {row.current_profile}")
+    ui.label(f"Default profile: {runtime.cfg.runtime.permission_profile}")
     ui.label(f"Read-only mode: {state.read_only}")
+    with ui.card().classes("w-full"):
+        ui.label("Permission profiles").classes("text-sm font-medium")
+        for key, desc in _permission_profile_descriptions():
+            ui.label(f"{key}: {desc}").classes("text-xs")
 
     profile_select = ui.select(
         [p.value for p in PermissionProfile],
@@ -226,40 +241,59 @@ def build_dashboard(config_path: str | None, read_only: bool, admin_token_overri
     if token is None:
         token = os.getenv(runtime.cfg.admin_token_env, "")
     state = DashboardState(admin_token=token or "", read_only=read_only or bool(runtime.cfg.admin_read_only))
+    ui.colors(
+        primary="#14532D",
+        secondary="#1F2937",
+        accent="#0EA5E9",
+        dark="#0F172A",
+        positive="#16A34A",
+        negative="#DC2626",
+        warning="#D97706",
+        info="#0284C7",
+    )
+    ui.add_css(
+        """
+        body {
+            background: linear-gradient(180deg, #F8FAFC 0%, #ECFDF5 100%);
+        }
+        .q-card {
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+        }
+        """
+    )
 
     @ui.page("/")
     def dashboard() -> None:
-        ui.label("LittleHive Operator Dashboard").classes("text-2xl font-bold")
-        with ui.tabs().classes("w-full") as tabs:
-            t1 = ui.tab("Overview")
-            t2 = ui.tab("Providers")
-            t3 = ui.tab("Tasks")
-            t4 = ui.tab("Traces")
-            t5 = ui.tab("Memory")
-            t6 = ui.tab("Permissions")
-            t7 = ui.tab("Usage")
-            t8 = ui.tab("Diagnostics")
-            t9 = ui.tab("Confirmations")
+        with ui.column().classes("w-full max-w-[1200px] mx-auto p-4 gap-4"):
+            ui.label("LittleHive Operator Dashboard").classes("text-2xl font-bold text-slate-800")
+            with ui.tabs().classes("w-full") as tabs:
+                t1 = ui.tab("Overview")
+                t2 = ui.tab("Providers")
+                t3 = ui.tab("Tasks")
+                t5 = ui.tab("Memory")
+                t6 = ui.tab("Permissions")
+                t7 = ui.tab("Usage")
+                t8 = ui.tab("Diagnostics")
+                t9 = ui.tab("Confirmations")
 
-        with ui.tab_panels(tabs, value=t1).classes("w-full"):
-            with ui.tab_panel(t1):
-                _render_overview(runtime)
-            with ui.tab_panel(t2):
-                _render_providers(runtime)
-            with ui.tab_panel(t3):
-                _render_tasks(runtime)
-            with ui.tab_panel(t4):
-                ui.markdown("Use **Tasks** tab to inspect traces by task id.")
-            with ui.tab_panel(t5):
-                _render_memory(runtime)
-            with ui.tab_panel(t6):
-                _render_permissions(runtime, state)
-            with ui.tab_panel(t7):
-                _render_usage(runtime)
-            with ui.tab_panel(t8):
-                _render_failures(runtime)
-            with ui.tab_panel(t9):
-                _render_confirmations(runtime, state)
+            with ui.tab_panels(tabs, value=t1).classes("w-full"):
+                with ui.tab_panel(t1):
+                    _render_overview(runtime)
+                with ui.tab_panel(t2):
+                    _render_providers(runtime)
+                with ui.tab_panel(t3):
+                    _render_tasks(runtime)
+                with ui.tab_panel(t5):
+                    _render_memory(runtime)
+                with ui.tab_panel(t6):
+                    _render_permissions(runtime, state)
+                with ui.tab_panel(t7):
+                    _render_usage(runtime)
+                with ui.tab_panel(t8):
+                    _render_failures(runtime)
+                with ui.tab_panel(t9):
+                    _render_confirmations(runtime, state)
 
     return runtime, state
 

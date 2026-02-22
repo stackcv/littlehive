@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, select
 
@@ -69,6 +69,7 @@ class TaskPipeline:
         self.planner = PlannerAgent()
         self.execution = ExecutionAgent(tool_executor.registry, tool_executor)
         self.reply_agent = ReplyAgent()
+        self._task_reuse_window = timedelta(minutes=45)
 
     def _default_model(self) -> str:
         preferred = (self.cfg.providers.primary or "").strip()
@@ -182,13 +183,42 @@ class TaskPipeline:
             mark_recovered(db, fingerprint_id=fingerprint_id, strategy=strategy)
             db.commit()
 
+    def _reuse_recent_task(self, session_id: int) -> int | None:
+        cutoff = _utcnow() - self._task_reuse_window
+        with self.db_session_factory() as db:
+            row = (
+                db.execute(select(Task).where(Task.session_id == session_id).order_by(Task.updated_at.desc()).limit(1))
+                .scalars()
+                .first()
+            )
+            if row is None:
+                return None
+            threshold = cutoff if getattr(row.updated_at, "tzinfo", None) else cutoff.replace(tzinfo=None)
+            return int(row.id) if row.updated_at >= threshold else None
+
     async def run_for_telegram(self, telegram_user_id: int, chat_id: int, user_text: str) -> PipelineResponse:
         user_db_id, session_db_id = self.ensure_user_session(telegram_user_id, chat_id)
         trace_id = uuid.uuid4().hex[:12]
 
         task_ctx = ToolCallContext(session_db_id=session_db_id, user_db_id=user_db_id, task_id=None, trace_id=trace_id)
-        task_record = self.tool_executor.execute("task.create", task_ctx, {"summary": user_text[:120]})
-        task_id = int(task_record["task_id"])
+        reused_task_id = self._reuse_recent_task(session_db_id)
+        if reused_task_id is None:
+            task_record = self.tool_executor.execute("task.create", task_ctx, {"summary": user_text[:120]})
+            task_id = int(task_record["task_id"])
+        else:
+            task_id = reused_task_id
+            task_ctx.task_id = task_id
+            self.tool_executor.execute(
+                "task.update",
+                task_ctx,
+                {
+                    "task_id": task_id,
+                    "status": "running",
+                    "step_index": 0,
+                    "agent_id": "orchestrator_agent",
+                    "detail": "new message turn",
+                },
+            )
 
         trace = TraceContext(
             request_id=trace_id,
