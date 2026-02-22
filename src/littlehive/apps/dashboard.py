@@ -235,6 +235,77 @@ def _render_confirmations(runtime, state: DashboardState) -> None:
         ui.button("Apply decision", on_click=act)
 
 
+def _render_users(runtime, state: DashboardState) -> None:
+    rows = runtime.admin_service.list_users(limit=200)
+    _build_table(
+        [
+            {"name": "id", "label": "ID", "field": "id"},
+            {"name": "telegram_user_id", "label": "Telegram ID", "field": "telegram_user_id"},
+            {"name": "display_name", "label": "Name", "field": "display_name"},
+            {"name": "preferred_timezone", "label": "Timezone", "field": "preferred_timezone"},
+            {"name": "city", "label": "City", "field": "city"},
+            {"name": "country", "label": "Country", "field": "country"},
+        ],
+        rows,
+    )
+
+    with ui.card().classes("w-full"):
+        ui.label("Edit user context (optional)")
+        user_id = ui.input("User ID", placeholder="e.g. 1")
+        display_name = ui.input("Name")
+        timezone = ui.input("Timezone", placeholder="e.g. Asia/Kolkata")
+        city = ui.input("City")
+        country = ui.input("Country")
+        notes = ui.textarea("Notes", placeholder="Any optional personalized context")
+        token_input = ui.input("Admin token", password=True, password_toggle_button=True)
+
+        def load_profile() -> None:
+            try:
+                uid = int(user_id.value)
+            except Exception:  # noqa: BLE001
+                ui.notify("invalid user id", type="negative")
+                return
+            profile = runtime.admin_service.get_user_profile(uid)
+            if profile is None:
+                ui.notify("user not found", type="negative")
+                return
+            display_name.value = profile["display_name"]
+            timezone.value = profile["preferred_timezone"]
+            city.value = profile["city"]
+            country.value = profile["country"]
+            notes.value = profile["profile_notes"]
+            ui.notify("profile loaded", type="positive")
+
+        def save_profile() -> None:
+            if state.read_only:
+                ui.notify("read-only mode enabled", type="warning")
+                return
+            if state.admin_token and token_input.value != state.admin_token:
+                ui.notify("invalid admin token", type="negative")
+                return
+            try:
+                uid = int(user_id.value)
+            except Exception:  # noqa: BLE001
+                ui.notify("invalid user id", type="negative")
+                return
+            try:
+                runtime.admin_service.update_user_profile(
+                    user_id=uid,
+                    display_name=display_name.value,
+                    preferred_timezone=timezone.value,
+                    city=city.value,
+                    country=country.value,
+                    profile_notes=notes.value,
+                )
+                ui.notify("profile updated", type="positive")
+            except Exception as exc:  # noqa: BLE001
+                ui.notify(f"error: {exc}", type="negative")
+
+        with ui.row():
+            ui.button("Load", on_click=load_profile)
+            ui.button("Save", on_click=save_profile)
+
+
 def build_dashboard(config_path: str | None, read_only: bool, admin_token_override: str | None) -> tuple[object, DashboardState]:
     runtime = build_operator_runtime(config_path=config_path)
     token = admin_token_override
@@ -271,6 +342,7 @@ def build_dashboard(config_path: str | None, read_only: bool, admin_token_overri
                 t1 = ui.tab("Overview")
                 t2 = ui.tab("Providers")
                 t3 = ui.tab("Tasks")
+                t4 = ui.tab("Users")
                 t5 = ui.tab("Memory")
                 t6 = ui.tab("Permissions")
                 t7 = ui.tab("Usage")
@@ -284,6 +356,8 @@ def build_dashboard(config_path: str | None, read_only: bool, admin_token_overri
                     _render_providers(runtime)
                 with ui.tab_panel(t3):
                     _render_tasks(runtime)
+                with ui.tab_panel(t4):
+                    _render_users(runtime, state)
                 with ui.tab_panel(t5):
                     _render_memory(runtime)
                 with ui.tab_panel(t6):

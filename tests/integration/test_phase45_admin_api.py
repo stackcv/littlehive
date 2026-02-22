@@ -178,3 +178,32 @@ def test_confirmation_flow_confirm_and_deny(api_client):
     )
     assert denied.status_code == 200
     assert denied.json()["status"] == "denied"
+
+
+def test_user_profile_list_and_update(api_client):
+    client, _sf = api_client
+    listed = client.get("/users")
+    assert listed.status_code == 200
+    items = listed.json()["items"]
+    assert items
+    user_id = items[0]["id"]
+
+    updated = client.patch(
+        f"/users/{user_id}/profile",
+        headers={"x-admin-token": "test-token"},
+        json={
+            "display_name": "Anupam",
+            "preferred_timezone": "Asia/Kolkata",
+            "city": "Pune",
+            "country": "India",
+            "profile_notes": "Prefers concise answers",
+        },
+    )
+    assert updated.status_code == 200
+    body = updated.json()
+    assert body["display_name"] == "Anupam"
+    assert body["preferred_timezone"] == "Asia/Kolkata"
+
+    fetched = client.get(f"/users/{user_id}/profile")
+    assert fetched.status_code == 200
+    assert fetched.json()["city"] == "Pune"

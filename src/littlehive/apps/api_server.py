@@ -15,6 +15,8 @@ from littlehive.core.admin.schemas import (
     ConfirmationDecisionRequest,
     PermissionProfileResponse,
     PermissionProfileUpdateRequest,
+    UserProfileModel,
+    UserProfileUpdateRequest,
 )
 from littlehive.core.permissions.policy_engine import PermissionProfile
 
@@ -102,6 +104,34 @@ def create_app(config_path: str | None = None) -> FastAPI:
         limit: int = Query(default=20, ge=1, le=200),
     ) -> dict:
         return {"items": runtime.admin_service.memory_search(query=q, session_id=session_id, user_id=user_id, limit=limit)}
+
+    @app.get("/users")
+    def users(limit: int = Query(default=100, ge=1, le=500)) -> dict:
+        return {"items": runtime.admin_service.list_users(limit=limit)}
+
+    @app.get("/users/{user_id}/profile", response_model=UserProfileModel)
+    def get_user_profile(user_id: int) -> UserProfileModel:
+        row = runtime.admin_service.get_user_profile(user_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="user_not_found")
+        return UserProfileModel(**row)
+
+    @app.patch("/users/{user_id}/profile", response_model=UserProfileModel)
+    def patch_user_profile(
+        user_id: int,
+        payload: UserProfileUpdateRequest,
+        _=Depends(_require_admin_token),
+    ) -> UserProfileModel:
+        _assert_mutations_allowed()
+        updated = runtime.admin_service.update_user_profile(
+            user_id=user_id,
+            display_name=payload.display_name,
+            preferred_timezone=payload.preferred_timezone,
+            city=payload.city,
+            country=payload.country,
+            profile_notes=payload.profile_notes,
+        )
+        return UserProfileModel(**updated)
 
     @app.get("/permissions/profile", response_model=PermissionProfileResponse)
     def get_permission_profile() -> PermissionProfileResponse:

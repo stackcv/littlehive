@@ -62,11 +62,22 @@ Main views:
 - Overview
 - Providers (health + breaker + routing score)
 - Tasks
+- Users (optional profile context: name/timezone/city/country/notes)
 - Memory search
 - Permissions and power controls
 - Usage/Budgets
 - Diagnostics/Failures
 - Pending confirmations
+
+## Optional User Context
+You can optionally store per-user context from the Dashboard `Users` tab (or admin API):
+- display name
+- preferred timezone
+- city
+- country
+- notes
+
+This context is injected into runtime metadata and can be used for personalized responses.
 
 ## Safety and Permission Profiles
 Supported permission profiles:

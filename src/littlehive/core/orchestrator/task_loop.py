@@ -183,6 +183,21 @@ class TaskPipeline:
             mark_recovered(db, fingerprint_id=fingerprint_id, strategy=strategy)
             db.commit()
 
+    def _user_context_metadata(self, user_id: int) -> dict:
+        with self.db_session_factory() as db:
+            row = db.execute(select(User).where(User.id == user_id)).scalar_one_or_none()
+        if row is None:
+            return {}
+        profile = {
+            "name": row.display_name,
+            "timezone": row.preferred_timezone,
+            "city": row.city,
+            "country": row.country,
+            "notes": row.profile_notes,
+        }
+        compact = {k: v for k, v in profile.items() if isinstance(v, str) and v.strip()}
+        return {"user_profile": compact} if compact else {}
+
     def _reuse_recent_task(self, session_id: int) -> int | None:
         cutoff = _utcnow() - self._task_reuse_window
         with self.db_session_factory() as db:
@@ -229,6 +244,7 @@ class TaskPipeline:
         )
         trace_event(self.logger, trace, event="task_start", status="ok")
         self._persist_message(session_db_id, "user", user_text, trace_id)
+        user_meta = self._user_context_metadata(user_db_id)
 
         task_ctx.task_id = task_id
 
@@ -262,7 +278,7 @@ class TaskPipeline:
                 tool_context_mode="routing",
                 tool_registry=self.tool_executor.registry,
                 tool_query=user_text,
-                extra_metadata={"phase": "planner"},
+                extra_metadata={"phase": "planner", **user_meta},
             )
             trace_event(
                 self.logger,
@@ -315,7 +331,7 @@ class TaskPipeline:
                     selected_tool_names=[],
                     tool_registry=self.tool_executor.registry,
                     tool_query=planner_output.tool_intent_query,
-                    extra_metadata={"phase": "execution"},
+                    extra_metadata={"phase": "execution", **user_meta},
                 )
                 trace_event(
                     self.logger,
@@ -355,7 +371,7 @@ class TaskPipeline:
                 budget=budget,
                 task_payload=execution_summary[:900] if execution_summary else "",
                 tool_context_mode="none",
-                extra_metadata={"phase": "reply"},
+                extra_metadata={"phase": "reply", **user_meta},
             )
             trace_event(
                 self.logger,

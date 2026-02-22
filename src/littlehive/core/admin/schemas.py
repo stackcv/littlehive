@@ -110,3 +110,24 @@ class FailureSummaryModel(BaseModel):
     recovered: int
     last_strategy: str
     last_seen: str
+
+
+class UserProfileModel(BaseModel):
+    id: int
+    telegram_user_id: int | None
+    external_id: str
+    display_name: str
+    preferred_timezone: str
+    city: str
+    country: str
+    profile_notes: str
+    profile_updated_at: datetime
+    created_at: datetime
+
+
+class UserProfileUpdateRequest(BaseModel):
+    display_name: str | None = None
+    preferred_timezone: str | None = None
+    city: str | None = None
+    country: str | None = None
+    profile_notes: str | None = None

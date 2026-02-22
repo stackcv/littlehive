@@ -11,6 +11,9 @@ Key endpoints:
 - `GET /tasks`
 - `GET /tasks/{task_id}/trace`
 - `GET /memory/search`
+- `GET /users`
+- `GET /users/{user_id}/profile`
+- `PATCH /users/{user_id}/profile`
 - `GET /permissions/profile`
 - `PATCH /permissions/profile`
 - `GET /usage`

@@ -18,6 +18,12 @@ class User(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     external_id: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
     telegram_user_id: Mapped[int | None] = mapped_column(Integer, unique=True, nullable=True)
+    display_name: Mapped[str] = mapped_column(String(128), nullable=False, default="")
+    preferred_timezone: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    city: Mapped[str] = mapped_column(String(128), nullable=False, default="")
+    country: Mapped[str] = mapped_column(String(128), nullable=False, default="")
+    profile_notes: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    profile_updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
 
 

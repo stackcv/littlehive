@@ -17,6 +17,7 @@ from littlehive.db.models import (
     SessionSummary,
     Task,
     TaskTraceSummary,
+    User,
 )
 
 
@@ -268,3 +269,78 @@ class AdminService:
         data = runtime_stats(self.db_session_factory)
         data["safe_mode"] = bool(self.cfg.runtime.safe_mode)
         return data
+
+    def list_users(self, limit: int = 100) -> list[dict]:
+        with self.db_session_factory() as db:
+            rows = db.execute(select(User).order_by(User.id.asc()).limit(limit)).scalars().all()
+        return [
+            {
+                "id": r.id,
+                "telegram_user_id": r.telegram_user_id,
+                "external_id": r.external_id,
+                "display_name": r.display_name,
+                "preferred_timezone": r.preferred_timezone,
+                "city": r.city,
+                "country": r.country,
+                "profile_notes": r.profile_notes,
+                "profile_updated_at": r.profile_updated_at,
+                "created_at": r.created_at,
+            }
+            for r in rows
+        ]
+
+    def get_user_profile(self, user_id: int) -> dict | None:
+        with self.db_session_factory() as db:
+            row = db.execute(select(User).where(User.id == user_id)).scalar_one_or_none()
+        if row is None:
+            return None
+        return {
+            "id": row.id,
+            "telegram_user_id": row.telegram_user_id,
+            "external_id": row.external_id,
+            "display_name": row.display_name,
+            "preferred_timezone": row.preferred_timezone,
+            "city": row.city,
+            "country": row.country,
+            "profile_notes": row.profile_notes,
+            "profile_updated_at": row.profile_updated_at,
+            "created_at": row.created_at,
+        }
+
+    def update_user_profile(
+        self,
+        *,
+        user_id: int,
+        display_name: str | None,
+        preferred_timezone: str | None,
+        city: str | None,
+        country: str | None,
+        profile_notes: str | None,
+    ) -> dict:
+        with self.db_session_factory() as db:
+            row = db.execute(select(User).where(User.id == user_id)).scalar_one()
+            if display_name is not None:
+                row.display_name = display_name[:128]
+            if preferred_timezone is not None:
+                row.preferred_timezone = preferred_timezone[:64]
+            if city is not None:
+                row.city = city[:128]
+            if country is not None:
+                row.country = country[:128]
+            if profile_notes is not None:
+                row.profile_notes = profile_notes[:2000]
+            row.profile_updated_at = _utcnow()
+            db.commit()
+            db.refresh(row)
+        return {
+            "id": row.id,
+            "telegram_user_id": row.telegram_user_id,
+            "external_id": row.external_id,
+            "display_name": row.display_name,
+            "preferred_timezone": row.preferred_timezone,
+            "city": row.city,
+            "country": row.country,
+            "profile_notes": row.profile_notes,
+            "profile_updated_at": row.profile_updated_at,
+            "created_at": row.created_at,
+        }
