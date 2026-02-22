@@ -25,6 +25,8 @@ jobs:
         run: pytest -q
       - name: Build
         run: python -m build
+      - name: Run littlehive-run smoke
+        run: python -m littlehive.apps.run --help
 
   package-smoke:
     runs-on: ubuntu-latest
