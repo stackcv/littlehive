@@ -31,6 +31,16 @@ No PyPI API token secret is needed when using Trusted Publisher.
 
 ## 2) Normal release flow
 
+Preferred (single command):
+
+```bash
+scripts/release.sh 0.5.2
+```
+
+This updates versions, builds/checks, commits, tags, and pushes branch + tag.
+
+Manual alternative:
+
 1. Bump version in `pyproject.toml` and `src/littlehive/__init__.py`.
 2. Commit and push.
 3. Create and push tag matching version:
