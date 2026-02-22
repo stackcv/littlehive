@@ -8,17 +8,24 @@ LittleHive is a local-first, multi-model, multi-agent assistant platform optimiz
 - Transfer Primitive: clean-state handoffs between agents.
 - Context Compiler: central token-budget preflight + deterministic trimming.
 
+## Built-in Tools
+- `status.get`
+- `utility.echo`
+- `task.create`
+- `task.update`
+- `memory.search`
+- `memory.write`
+- `memory.summarize`
+- `memory.failure_fix`
+
 ## Install
 ```bash
 pip install littlehive
-pip install "littlehive[telegram]"
-pip install "littlehive[ui]"
-pip install "littlehive[full]"
 ```
 
 For development:
 ```bash
-pip install -e ".[dev,telegram,ui]"
+pip install -e ".[dev]"
 ```
 
 ## Quickstart

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 python -m pip install --upgrade pip
-python -m pip install -e ".[full,dev]"
+python -m pip install -e ".[dev]"
 
 littlehive-onboard --help >/dev/null
 littlehive-api --help >/dev/null

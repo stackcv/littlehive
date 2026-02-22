@@ -2,7 +2,7 @@
 
 ## Install
 ```bash
-pip install "littlehive[full]"
+pip install littlehive
 ```
 
 ## Recommended Start

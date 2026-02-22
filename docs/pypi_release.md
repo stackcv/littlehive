@@ -62,7 +62,7 @@ Use GitHub Actions -> `publish` -> Run workflow:
 ## 4) Local preflight (recommended)
 
 ```bash
-pip install -e ".[dev,telegram,ui]"
+pip install -e ".[dev]"
 python -m build
 twine check dist/*
 ```
@@ -71,7 +71,6 @@ twine check dist/*
 
 ```bash
 pip install littlehive
-pip install "littlehive[full]"
 ```
 
 ## Notes

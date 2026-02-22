@@ -37,3 +37,33 @@ def register_status_tools(registry, db_session_factory, provider_router):
         ),
         status_get,
     )
+
+    def utility_echo(ctx: ToolCallContext, args: dict) -> dict:
+        message = str(args.get("message", ""))
+        return {
+            "session_id": ctx.session_db_id,
+            "task_id": ctx.task_id,
+            "message": message,
+            "length": len(message),
+        }
+
+    registry.register(
+        ToolMetadata(
+            name="utility.echo",
+            version="1.0",
+            risk_level="low",
+            tags=["utility", "echo", "debug"],
+            routing_summary="Echo back provided text for connectivity and tool-path checks.",
+            invocation_summary="utility.echo(message) returns the same message and length.",
+            full_schema={
+                "type": "object",
+                "properties": {"message": {"type": "string"}},
+                "required": ["message"],
+            },
+            examples=["utility.echo(message='hello world')"],
+            timeout_sec=3,
+            idempotent=True,
+            permission_required="none",
+        ),
+        utility_echo,
+    )
