@@ -1,12 +1,6 @@
 # LittleHive
 
-LittleHive is a local-first, multi-model, multi-agent assistant platform optimized for small local models, strict context budgets, and low operating cost.
-
-## Core Concepts
-- ITR (Instruction-Tool Retrieval): only inject compact tool docs until invocation time.
-- Memory Cards: typed compact reusable memory units, not full transcript replay.
-- Transfer Primitive: clean-state handoffs between agents.
-- Context Compiler: central token-budget preflight + deterministic trimming.
+LittleHive is a local-first, multi-model, multi-agent assistant platform.
 
 ## Built-in Tools
 - `status.get`

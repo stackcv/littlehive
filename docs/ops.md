@@ -39,6 +39,10 @@ Default host/port from config:
 alembic upgrade head
 ```
 
+Notes:
+- Migrations are now a clean single baseline snapshot (`0001_base_schema`).
+- Older phase-by-phase migration history has been intentionally removed during stabilization.
+
 ## Packaging
 ```bash
 python -m build
