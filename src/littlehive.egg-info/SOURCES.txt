@@ -10,8 +10,10 @@ src/littlehive.egg-info/requires.txt
 src/littlehive.egg-info/top_level.txt
 src/littlehive/apps/__init__.py
 src/littlehive/apps/api_server.py
+src/littlehive/apps/dashboard.py
 src/littlehive/apps/diagnostics_cli.py
 src/littlehive/apps/onboarding_cli.py
+src/littlehive/apps/runtime_support.py
 src/littlehive/apps/supervisor.py
 src/littlehive/apps/telegram_worker.py
 src/littlehive/channels/__init__.py
@@ -20,6 +22,9 @@ src/littlehive/channels/telegram/adapter.py
 src/littlehive/channels/telegram/auth.py
 src/littlehive/channels/telegram/handlers.py
 src/littlehive/core/__init__.py
+src/littlehive/core/admin/__init__.py
+src/littlehive/core/admin/schemas.py
+src/littlehive/core/admin/service.py
 src/littlehive/core/agents/__init__.py
 src/littlehive/core/agents/base.py
 src/littlehive/core/agents/execution_agent.py
@@ -95,3 +100,4 @@ src/littlehive/db/migrations/versions/0001_phase0_init.py
 src/littlehive/db/migrations/versions/0002_phase1_runtime.py
 src/littlehive/db/migrations/versions/0003_phase2_optimization.py
 src/littlehive/db/migrations/versions/0004_phase3_resilience.py
+src/littlehive/db/migrations/versions/0005_phase45_admin_controls.py

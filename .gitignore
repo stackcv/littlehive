@@ -5,3 +5,7 @@ __pycache__/
 .env
 alembic.log
 *.db
+dist/
+build/
+*.egg-info/
+.ruff_cache/

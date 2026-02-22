@@ -4,6 +4,7 @@ timezone: Asia/Kolkata
 environment: dev
 runtime:
   safe_mode: true
+  permission_profile: execute_safe
   request_timeout_seconds: 30
   max_steps: 4
   retry_attempts: 2
@@ -49,3 +50,7 @@ channels:
     owner_user_id: null
     allow_user_ids: []
     polling_timeout_seconds: 30
+dashboard_host: 127.0.0.1
+dashboard_port: 8666
+admin_token_env: LITTLEHIVE_ADMIN_TOKEN
+admin_read_only: false

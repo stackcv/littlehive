@@ -19,6 +19,7 @@ class RuntimeConfig(BaseModel):
     breaker_cool_down_seconds: int = 25
     reflexion_max_per_step: int = 1
     reflexion_max_per_task: int = 2
+    permission_profile: str = "execute_safe"
 
 
 class ContextConfig(BaseModel):
@@ -77,3 +78,7 @@ class AppConfig(BaseModel):
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
     providers: ProvidersConfig = Field(default_factory=ProvidersConfig)
     channels: ChannelsConfig = Field(default_factory=ChannelsConfig)
+    dashboard_host: str = "127.0.0.1"
+    dashboard_port: int = 8666
+    admin_token_env: str = "LITTLEHIVE_ADMIN_TOKEN"
+    admin_read_only: bool = False

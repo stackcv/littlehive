@@ -83,7 +83,7 @@ def register_memory_tools(registry, db_session_factory):
         ToolMetadata(
             name="memory.write",
             version="2.0",
-            risk_level="medium",
+            risk_level="low",
             tags=["memory", "write", "card"],
             routing_summary="Write reusable info as typed compact memory card.",
             invocation_summary="memory.write(content) stores fact/decision/preference/open_loop.",

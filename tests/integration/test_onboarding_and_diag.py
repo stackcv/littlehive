@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import os
-
 from littlehive.apps import diagnostics_cli, onboarding_cli
 
 

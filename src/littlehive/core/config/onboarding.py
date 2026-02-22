@@ -186,7 +186,7 @@ def collect_interactive_answers(input_func: Callable[[str], str], output_func: C
     tz_default = os.getenv("TZ", "Asia/Kolkata")
     output_func("LittleHive onboarding")
 
-    instance_name = input_func(f"Instance name [littlehive-local]: ").strip() or "littlehive-local"
+    instance_name = input_func("Instance name [littlehive-local]: ").strip() or "littlehive-local"
     timezone = input_func(f"Timezone [{tz_default}]: ").strip() or tz_default
     environment = input_func("Environment [dev]: ").strip() or "dev"
     config_path = input_func("Config output path [config/instance.yaml]: ").strip() or "config/instance.yaml"

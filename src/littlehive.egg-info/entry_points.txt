@@ -1,5 +1,6 @@
 [console_scripts]
 littlehive-api = littlehive.apps.api_server:main
+littlehive-dashboard = littlehive.apps.dashboard:main
 littlehive-diag = littlehive.apps.diagnostics_cli:main
 littlehive-onboard = littlehive.apps.onboarding_cli:main
 littlehive-supervisor = littlehive.apps.supervisor:main

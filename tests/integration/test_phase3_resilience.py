@@ -12,13 +12,12 @@ from littlehive.core.providers.base import ProviderAdapter, ProviderRequest, Pro
 from littlehive.core.providers.router import ProviderRouter
 from littlehive.core.runtime.locks import SessionLockManager
 from littlehive.core.telemetry.logging import get_logger
-from littlehive.core.tools.base import ToolMetadata
 from littlehive.core.tools.builtin.memory_tools import register_memory_tools
 from littlehive.core.tools.builtin.status_tools import register_status_tools
 from littlehive.core.tools.builtin.task_tools import register_task_tools
 from littlehive.core.tools.executor import ToolExecutor
 from littlehive.core.tools.registry import ToolRegistry
-from littlehive.db.models import FailureFingerprint, TaskTraceSummary, ToolCall
+from littlehive.db.models import TaskTraceSummary, ToolCall
 from littlehive.db.session import Base, create_session_factory
 
 

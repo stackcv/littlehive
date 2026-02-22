@@ -167,3 +167,40 @@ class TaskTraceSummary(Base):
     avg_estimated_tokens: Mapped[float] = mapped_column(nullable=False, default=0.0)
     outcome_status: Mapped[str] = mapped_column(String(32), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+
+
+class PermissionState(Base):
+    __tablename__ = "permission_state"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    current_profile: Mapped[str] = mapped_column(String(64), nullable=False, default="execute_safe")
+    updated_by: Mapped[str] = mapped_column(String(128), nullable=False, default="system")
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+
+
+class PermissionAuditEvent(Base):
+    __tablename__ = "permission_audit_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    actor: Mapped[str] = mapped_column(String(128), nullable=False, default="system")
+    event_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    previous_profile: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    next_profile: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    detail: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+
+
+class PendingConfirmation(Base):
+    __tablename__ = "pending_confirmations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    task_id: Mapped[int | None] = mapped_column(ForeignKey("tasks.id"), nullable=True)
+    session_id: Mapped[int | None] = mapped_column(ForeignKey("sessions.id"), nullable=True)
+    action_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    action_summary: Mapped[str] = mapped_column(Text, nullable=False)
+    payload_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="waiting_confirmation")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    decided_by: Mapped[str] = mapped_column(String(128), nullable=False, default="")

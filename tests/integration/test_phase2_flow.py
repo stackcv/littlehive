@@ -13,7 +13,6 @@ from littlehive.core.providers.router import ProviderRouter
 from littlehive.core.runtime.locks import SessionLockManager
 from littlehive.core.telemetry.logging import get_logger
 from littlehive.core.telemetry.tracing import recent_traces
-from littlehive.core.tools.base import ToolCallContext
 from littlehive.core.tools.builtin.memory_tools import register_memory_tools
 from littlehive.core.tools.builtin.status_tools import register_status_tools
 from littlehive.core.tools.builtin.task_tools import register_task_tools

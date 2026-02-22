@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "littlehive"
-version = "0.1.0"
+version = "0.5.0"
 description = "LittleHive local-first multi-agent assistant foundation"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -16,6 +16,7 @@ dependencies = [
   "sqlalchemy>=2.0",
   "alembic>=1.13",
   "fastapi>=0.110",
+  "uvicorn>=0.29",
   "httpx>=0.27",
   "tenacity>=8.2",
   "structlog>=24.1",
@@ -26,9 +27,23 @@ dependencies = [
 telegram = [
   "python-telegram-bot>=21.0"
 ]
+ui = [
+  "nicegui>=2.0"
+]
+groq = [
+  "groq>=0.11"
+]
 dev = [
+  "ruff>=0.4",
+  "build>=1.2",
+  "twine>=5.1",
   "pytest>=8.0",
   "pytest-asyncio>=0.23"
+]
+full = [
+  "python-telegram-bot>=21.0",
+  "nicegui>=2.0",
+  "groq>=0.11"
 ]
 
 [project.scripts]
@@ -37,6 +52,7 @@ littlehive-api = "littlehive.apps.api_server:main"
 littlehive-telegram = "littlehive.apps.telegram_worker:main"
 littlehive-diag = "littlehive.apps.diagnostics_cli:main"
 littlehive-supervisor = "littlehive.apps.supervisor:main"
+littlehive-dashboard = "littlehive.apps.dashboard:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

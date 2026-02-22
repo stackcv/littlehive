@@ -18,3 +18,7 @@ channels:
     token_env: LITTLEHIVE_TELEGRAM_TOKEN
     owner_user_id: 123456789
     allow_user_ids: [123456789]
+dashboard_host: 127.0.0.1
+dashboard_port: 8666
+admin_token_env: LITTLEHIVE_ADMIN_TOKEN
+admin_read_only: true
