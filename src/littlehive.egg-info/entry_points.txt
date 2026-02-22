@@ -1,7 +1,12 @@
 [console_scripts]
+lh-reset = littlehive.apps.reset:main
+lh-run = littlehive.apps.run:main
+lhive = littlehive.apps.short_cli:main
 littlehive-api = littlehive.apps.api_server:main
 littlehive-dashboard = littlehive.apps.dashboard:main
 littlehive-diag = littlehive.apps.diagnostics_cli:main
 littlehive-onboard = littlehive.apps.onboarding_cli:main
+littlehive-reset = littlehive.apps.reset:main
+littlehive-run = littlehive.apps.run:main
 littlehive-supervisor = littlehive.apps.supervisor:main
 littlehive-telegram = littlehive.apps.telegram_worker:main

@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: littlehive
-Version: 0.5.0
+Version: 0.5.3
 Summary: LittleHive local-first multi-agent assistant foundation
 Author: LittleHive
 License: MIT
@@ -57,26 +57,36 @@ pip install -e ".[dev,telegram,ui]"
 ```
 
 ## Quickstart
-1. Initialize config/env:
+1. Start LittleHive:
 ```bash
-littlehive-onboard
+lhive run
+# or: lh-run
 ```
-2. Validate config/hardware/providers:
+This will:
+- run **quick onboarding** on first launch (if config is missing),
+- load `.env`,
+- start API, dashboard, and Telegram worker (when enabled and token is present),
+- keep supervisor off by default to reduce console noise,
+- print the local dashboard URL.
+
+For full power-user onboarding prompts:
+```bash
+lhive run --advanced
+# or: littlehive-run --advanced
+```
+
+To reset local setup and start fresh:
+```bash
+lhive reset
+# or: lh-reset
+```
+
+2. Optional diagnostics:
 ```bash
 littlehive-diag --validate-config --hardware --check-providers
 ```
-3. Start Telegram worker:
-```bash
-littlehive-telegram --config config/instance.yaml
-```
-4. Start admin API:
-```bash
-littlehive-api --config config/instance.yaml --host 127.0.0.1 --port 8080
-```
-5. Start Python dashboard (NiceGUI):
-```bash
-littlehive-dashboard --config config/instance.yaml --host 127.0.0.1 --port 8666
-```
+
+Advanced/manual control CLIs are still available (see below).
 
 ## Dashboard
 `littlehive-dashboard` is Python-only (NiceGUI), no Node/React install required.
@@ -110,12 +120,17 @@ littlehive-diag --budget-stats
 ```
 
 ## CLI Entrypoints
+- `lhive` (short command: `lhive run`, `lhive reset`, `lhive diag`)
+- `lh-run` (short alias)
+- `lh-reset` (short alias)
+- `littlehive-run` (recommended for end users)
 - `littlehive-onboard`
 - `littlehive-api`
 - `littlehive-telegram`
 - `littlehive-diag`
 - `littlehive-dashboard`
 - `littlehive-supervisor`
+- `littlehive-reset`
 
 ## Development
 ```bash

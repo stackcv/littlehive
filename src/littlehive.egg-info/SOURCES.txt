@@ -13,7 +13,10 @@ src/littlehive/apps/api_server.py
 src/littlehive/apps/dashboard.py
 src/littlehive/apps/diagnostics_cli.py
 src/littlehive/apps/onboarding_cli.py
+src/littlehive/apps/reset.py
+src/littlehive/apps/run.py
 src/littlehive/apps/runtime_support.py
+src/littlehive/apps/short_cli.py
 src/littlehive/apps/supervisor.py
 src/littlehive/apps/telegram_worker.py
 src/littlehive/channels/__init__.py
