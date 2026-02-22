@@ -19,11 +19,7 @@ class OperatorRuntime:
 def build_operator_runtime(config_path: str | None = None) -> OperatorRuntime:
     cfg = load_app_config(instance_path=config_path)
     telegram_runtime = build_telegram_runtime(config_path=config_path)
-    admin_service = AdminService(
-        cfg=cfg,
-        db_session_factory=telegram_runtime.db_session_factory,
-        provider_router=telegram_runtime.pipeline.provider_router,
-    )
+    admin_service = telegram_runtime.admin_service
     if hasattr(telegram_runtime.tool_executor, "policy_engine"):
         policy_engine = telegram_runtime.tool_executor.policy_engine
     else:

@@ -8,6 +8,9 @@ httpx>=0.27
 tenacity>=8.2
 structlog>=24.1
 PyYAML>=6.0
+python-telegram-bot>=21.0
+nicegui>=2.0
+groq>=0.11
 
 [dev]
 ruff>=0.4
@@ -15,17 +18,3 @@ build>=1.2
 twine>=5.1
 pytest>=8.0
 pytest-asyncio>=0.23
-
-[full]
-python-telegram-bot>=21.0
-nicegui>=2.0
-groq>=0.11
-
-[groq]
-groq>=0.11
-
-[telegram]
-python-telegram-bot>=21.0
-
-[ui]
-nicegui>=2.0

@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: littlehive
-Version: 0.5.3
+Version: 0.5.4
 Summary: LittleHive local-first multi-agent assistant foundation
 Author: LittleHive
 License: MIT
@@ -16,44 +16,33 @@ Requires-Dist: httpx>=0.27
 Requires-Dist: tenacity>=8.2
 Requires-Dist: structlog>=24.1
 Requires-Dist: PyYAML>=6.0
-Provides-Extra: telegram
-Requires-Dist: python-telegram-bot>=21.0; extra == "telegram"
-Provides-Extra: ui
-Requires-Dist: nicegui>=2.0; extra == "ui"
-Provides-Extra: groq
-Requires-Dist: groq>=0.11; extra == "groq"
+Requires-Dist: python-telegram-bot>=21.0
+Requires-Dist: nicegui>=2.0
+Requires-Dist: groq>=0.11
 Provides-Extra: dev
 Requires-Dist: ruff>=0.4; extra == "dev"
 Requires-Dist: build>=1.2; extra == "dev"
 Requires-Dist: twine>=5.1; extra == "dev"
 Requires-Dist: pytest>=8.0; extra == "dev"
 Requires-Dist: pytest-asyncio>=0.23; extra == "dev"
-Provides-Extra: full
-Requires-Dist: python-telegram-bot>=21.0; extra == "full"
-Requires-Dist: nicegui>=2.0; extra == "full"
-Requires-Dist: groq>=0.11; extra == "full"
 
 # LittleHive
 
-LittleHive is a local-first, multi-model, multi-agent assistant platform optimized for small local models, strict context budgets, and low operating cost.
+LittleHive is a local-first, multi-model, multi-agent assistant platform.
 
-## Core Concepts
-- ITR (Instruction-Tool Retrieval): only inject compact tool docs until invocation time.
-- Memory Cards: typed compact reusable memory units, not full transcript replay.
-- Transfer Primitive: clean-state handoffs between agents.
-- Context Compiler: central token-budget preflight + deterministic trimming.
+## Built-in Tools
+- `status.get`
+- `utility.echo`
+- `task.create`
+- `task.update`
+- `memory.search`
+- `memory.write`
+- `memory.summarize`
+- `memory.failure_fix`
 
 ## Install
 ```bash
 pip install littlehive
-pip install "littlehive[telegram]"
-pip install "littlehive[ui]"
-pip install "littlehive[full]"
-```
-
-For development:
-```bash
-pip install -e ".[dev,telegram,ui]"
 ```
 
 ## Quickstart
@@ -94,22 +83,35 @@ Advanced/manual control CLIs are still available (see below).
 Main views:
 - Overview
 - Providers (health + breaker + routing score)
-- Tasks/Traces
+- Tasks
+- Users (optional profile context: name/timezone/city/country/notes)
 - Memory search
 - Permissions and power controls
 - Usage/Budgets
 - Diagnostics/Failures
 - Pending confirmations
 
+## Optional User Context
+You can optionally store per-user context from the Dashboard `Users` tab (or admin API):
+- display name
+- preferred timezone
+- city
+- country
+- notes
+
+This context is injected into runtime metadata and can be used for personalized responses.
+
 ## Safety and Permission Profiles
 Supported permission profiles:
-- `read_only`
-- `assist_only`
-- `execute_safe`
-- `execute_with_confirmation`
-- `full_trusted`
+- `read_only`: blocks all tool execution.
+- `assist_only`: allows only low-risk tool actions.
+- `execute_safe`: allows low-risk, requires confirmation for medium-risk, blocks high/critical.
+- `execute_with_confirmation`: allows medium/high with confirmation, blocks critical in safe mode.
+- `full_trusted`: allows all except critical when safe mode is enabled.
 
 Risk levels (`low|medium|high|critical`) are enforced in tool execution. Medium/high actions can require confirmations depending on profile and safe mode.
+Default profile is `execute_safe`.
+Profile can be changed from the Dashboard Permissions tab or via Admin API (`PATCH /permissions/profile`).
 
 ## Diagnostics
 ```bash
@@ -133,6 +135,12 @@ littlehive-diag --budget-stats
 - `littlehive-reset`
 
 ## Development
+Install editable package with dev tooling:
+```bash
+pip install -e ".[dev]"
+```
+
+Run checks:
 ```bash
 pytest -q
 python -m build

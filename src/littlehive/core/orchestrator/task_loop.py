@@ -57,6 +57,7 @@ class TaskPipeline:
         db_session_factory,
         tool_executor: ToolExecutor,
         provider_router: ProviderRouter,
+        safe_mode_getter=None,
     ) -> None:
         self.cfg = cfg
         self.db_session_factory = db_session_factory
@@ -70,6 +71,10 @@ class TaskPipeline:
         self.execution = ExecutionAgent(tool_executor.registry, tool_executor)
         self.reply_agent = ReplyAgent()
         self._task_reuse_window = timedelta(minutes=45)
+        self._safe_mode_getter = safe_mode_getter or (lambda: bool(self.cfg.runtime.safe_mode))
+
+    def _safe_mode(self) -> bool:
+        return bool(self._safe_mode_getter())
 
     def _default_model(self) -> str:
         preferred = (self.cfg.providers.primary or "").strip()
@@ -416,7 +421,7 @@ class TaskPipeline:
                     error_retryable=info.retryable,
                     attempts_used=0,
                     max_per_step=self.cfg.runtime.reflexion_max_per_step,
-                    safe_mode=self.cfg.runtime.safe_mode,
+                    safe_mode=self._safe_mode(),
                 ):
                     reflexion_context = self.compiler.compile(
                         agent_role="recovery_agent",
@@ -444,7 +449,7 @@ class TaskPipeline:
                     decision = reflexion_lite_decide(
                         error_summary=compact,
                         has_fallback_provider=len(fallback_order) > 1,
-                        safe_mode=self.cfg.runtime.safe_mode,
+                        safe_mode=self._safe_mode(),
                     )
                     trace_event(
                         self.logger,
@@ -455,7 +460,7 @@ class TaskPipeline:
                     )
 
                     try:
-                        if decision.strategy == "switch_provider" and not self.cfg.runtime.safe_mode:
+                        if decision.strategy == "switch_provider" and not self._safe_mode():
                             provider_response = self.provider_router.dispatch_with_fallback(
                                 provider_request,
                                 provider_order=list(reversed(fallback_order)),

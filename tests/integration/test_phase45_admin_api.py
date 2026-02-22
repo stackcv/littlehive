@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 
 from littlehive.apps.api_server import create_app
 from littlehive.core.config.loader import load_app_config
-from littlehive.db.models import MemoryRecord, PermissionAuditEvent, Session, Task, TaskTraceSummary, User
+from littlehive.db.models import MemoryRecord, PermissionAuditEvent, RuntimeControlEvent, Session, Task, TaskTraceSummary, User
 from littlehive.db.session import create_session_factory
 
 
@@ -207,3 +207,43 @@ def test_user_profile_list_and_update(api_client):
     fetched = client.get(f"/users/{user_id}/profile")
     assert fetched.status_code == 200
     assert fetched.json()["city"] == "Pune"
+
+
+def test_principal_grant_and_runtime_apply(api_client):
+    client, sf = api_client
+    grant = client.post(
+        "/principals/grants",
+        headers={"x-admin-token": "test-token"},
+        json={
+            "channel": "telegram",
+            "external_id": "7760209623",
+            "grant_type": "chat_access",
+            "allowed": True,
+            "actor": "integration",
+        },
+    )
+    assert grant.status_code == 200
+    assert grant.json()["allowed"] is True
+
+    principals = client.get("/principals", params={"channel": "telegram"})
+    assert principals.status_code == 200
+    assert any(x["external_id"] == "7760209623" for x in principals.json()["items"])
+
+    applied = client.post(
+        "/runtime/apply",
+        headers={"x-admin-token": "test-token"},
+        json={"safe_mode": False, "request_restart": True, "actor": "integration"},
+    )
+    assert applied.status_code == 200
+    assert applied.json()["safe_mode"] is False
+    assert applied.json()["restart_requested"] is True
+    assert applied.json()["control_event_id"] is not None
+
+    with sf() as db:
+        row = (
+            db.query(RuntimeControlEvent)
+            .order_by(RuntimeControlEvent.id.desc())
+            .first()
+        )
+        assert row is not None
+        assert row.status == "pending"

@@ -7,13 +7,17 @@ import subprocess
 import sys
 import time
 import webbrowser
+from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
+from sqlalchemy import select
 
 from littlehive.cli import base_parser
 from littlehive.core.config.loader import load_app_config
 from littlehive.core.config.onboarding import OnboardingAnswers, collect_interactive_answers, parse_id_list, run_onboarding
+from littlehive.db.models import RuntimeControlEvent
+from littlehive.db.session import create_session_factory
 
 ENV_VAR_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
@@ -196,6 +200,30 @@ def _spawn(name: str, cmd: list[str], env: dict[str, str]) -> subprocess.Popen:
     return subprocess.Popen(cmd, env=env)
 
 
+def _consume_restart_request(session_factory) -> bool:
+    try:
+        with session_factory() as db:
+            row = (
+                db.execute(
+                    select(RuntimeControlEvent)
+                    .where(RuntimeControlEvent.status == "pending")
+                    .where(RuntimeControlEvent.event_type == "restart_services")
+                    .order_by(RuntimeControlEvent.id.asc())
+                )
+                .scalars()
+                .first()
+            )
+            if row is None:
+                return False
+            row.status = "applied"
+            row.detail = "run loop acknowledged restart request"
+            row.processed_at = datetime.now(timezone.utc)
+            db.commit()
+            return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def _shutdown(children: list[tuple[str, subprocess.Popen]]) -> None:
     for _, proc in children:
         if proc.poll() is None:
@@ -304,6 +332,7 @@ def main() -> int:
     except Exception as exc:  # noqa: BLE001
         print(f"Invalid config: {exc}")
         return 1
+    control_session_factory, _control_engine = create_session_factory(cfg.database.url)
 
     dashboard_host = args.dashboard_host or cfg.dashboard_host
     dashboard_port = args.dashboard_port or cfg.dashboard_port
@@ -328,49 +357,40 @@ def main() -> int:
         else:
             print("Telegram is enabled in config but token is missing; skipping Telegram worker.")
 
-    children: list[tuple[str, subprocess.Popen]] = []
-
+    service_specs: list[tuple[str, list[str]]] = []
     if start_api:
-        children.append(
+        service_specs.append(
             (
                 "api",
-                _spawn(
-                    "api",
-                    [
-                        sys.executable,
-                        "-m",
-                        "littlehive.apps.api_server",
-                        "--config",
-                        str(config_path),
-                        "--host",
-                        args.api_host,
-                        "--port",
-                        str(args.api_port),
-                    ],
-                    env,
-                ),
+                [
+                    sys.executable,
+                    "-m",
+                    "littlehive.apps.api_server",
+                    "--config",
+                    str(config_path),
+                    "--host",
+                    args.api_host,
+                    "--port",
+                    str(args.api_port),
+                ],
             )
         )
 
     if start_dashboard:
-        children.append(
+        service_specs.append(
             (
                 "dashboard",
-                _spawn(
-                    "dashboard",
-                    [
-                        sys.executable,
-                        "-m",
-                        "littlehive.apps.dashboard",
-                        "--config",
-                        str(config_path),
-                        "--host",
-                        dashboard_host,
-                        "--port",
-                        str(dashboard_port),
-                    ],
-                    env,
-                ),
+                [
+                    sys.executable,
+                    "-m",
+                    "littlehive.apps.dashboard",
+                    "--config",
+                    str(config_path),
+                    "--host",
+                    dashboard_host,
+                    "--port",
+                    str(dashboard_port),
+                ],
             )
         )
         url = f"http://{dashboard_host}:{dashboard_port}"
@@ -382,40 +402,34 @@ def main() -> int:
                 pass
 
     if start_telegram:
-        children.append(
+        service_specs.append(
             (
                 "telegram",
-                _spawn(
-                    "telegram",
-                    [sys.executable, "-m", "littlehive.apps.telegram_worker", "--config", str(config_path)],
-                    env,
-                ),
+                [sys.executable, "-m", "littlehive.apps.telegram_worker", "--config", str(config_path)],
             )
         )
 
     if start_supervisor:
-        children.append(
+        service_specs.append(
             (
                 "supervisor",
-                _spawn(
-                    "supervisor",
-                    [
-                        sys.executable,
-                        "-m",
-                        "littlehive.apps.supervisor",
-                        "--config",
-                        str(config_path),
-                        "--interval",
-                        str(args.supervisor_interval),
-                    ],
-                    env,
-                ),
+                [
+                    sys.executable,
+                    "-m",
+                    "littlehive.apps.supervisor",
+                    "--config",
+                    str(config_path),
+                    "--interval",
+                    str(args.supervisor_interval),
+                ],
             )
         )
 
-    if not children:
+    if not service_specs:
         print("Nothing to run. Re-enable at least one service.")
         return 1
+
+    children: list[tuple[str, subprocess.Popen]] = [(name, _spawn(name, cmd, env)) for name, cmd in service_specs]
 
     print("LittleHive is running. Press Ctrl+C to stop all services.")
 
@@ -433,6 +447,12 @@ def main() -> int:
         while True:
             if interrupted:
                 break
+
+            if _consume_restart_request(control_session_factory):
+                print("Received restart request from control plane. Restarting services...")
+                _shutdown(children)
+                children = [(name, _spawn(name, cmd, env)) for name, cmd in service_specs]
+                continue
 
             for name, proc in children:
                 code = proc.poll()

@@ -99,8 +99,4 @@ src/littlehive/db/__init__.py
 src/littlehive/db/models.py
 src/littlehive/db/session.py
 src/littlehive/db/migrations/env.py
-src/littlehive/db/migrations/versions/0001_phase0_init.py
-src/littlehive/db/migrations/versions/0002_phase1_runtime.py
-src/littlehive/db/migrations/versions/0003_phase2_optimization.py
-src/littlehive/db/migrations/versions/0004_phase3_resilience.py
-src/littlehive/db/migrations/versions/0005_phase45_admin_controls.py
+src/littlehive/db/migrations/versions/0001_base_schema.py

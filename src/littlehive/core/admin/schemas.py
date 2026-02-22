@@ -131,3 +131,19 @@ class UserProfileUpdateRequest(BaseModel):
     city: str | None = None
     country: str | None = None
     profile_notes: str | None = None
+
+
+class PrincipalGrantUpdateRequest(BaseModel):
+    channel: str = "telegram"
+    external_id: str
+    grant_type: str = "chat_access"
+    allowed: bool = True
+    display_name: str = ""
+    actor: str = "api"
+
+
+class RuntimeApplyRequest(BaseModel):
+    safe_mode: bool | None = None
+    profile: PermissionProfile | None = None
+    request_restart: bool = False
+    actor: str = "api"

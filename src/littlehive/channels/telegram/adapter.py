@@ -37,6 +37,7 @@ class TelegramRuntime:
     tool_executor: ToolExecutor
     db_session_factory: object
     logger: object
+    admin_service: AdminService | None = None
 
     async def handle_user_text(self, user_id: int, chat_id: int, text: str) -> str:
         if not self.auth.is_allowed(user_id):
@@ -48,7 +49,7 @@ class TelegramRuntime:
             return "Welcome to LittleHive. Use /help to see commands."
         if command == "/help":
             return (
-                "Commands: /start /help /status /memory /debug\n"
+                "Commands: /start /help /status /memory /debug /allow /deny\n"
                 "Send any normal message to run the assistant pipeline."
             )
 
@@ -81,6 +82,42 @@ class TelegramRuntime:
                 f"budget_avg={bs['avg_estimated_prompt_tokens']} trims={bs['trim_event_count']}\n"
                 f"failures={len(failures)}"
             )
+
+        if command in {"/allow", "/deny"}:
+            if not self.auth.is_owner(user_id):
+                return "Unauthorized. Only owner can change access."
+            if self.admin_service is None:
+                return "Access control backend unavailable."
+            parts = text.strip().split()
+            if len(parts) < 2:
+                return f"Usage: {command} <telegram_user_id>"
+            target = parts[1].strip()
+            if ":" in target:
+                channel, external_id = target.split(":", 1)
+                channel = channel.strip().lower()
+                external_id = external_id.strip()
+            else:
+                channel = "telegram"
+                external_id = target
+            if not external_id:
+                return "Invalid target. Expected user id or channel:user_id."
+            allowed = command == "/allow"
+            self.admin_service.set_principal_grant(
+                channel=channel,
+                external_id=external_id,
+                grant_type="chat_access",
+                allowed=allowed,
+                actor=f"owner:{user_id}",
+            )
+            if command == "/deny":
+                self.admin_service.set_principal_grant(
+                    channel=channel,
+                    external_id=external_id,
+                    grant_type="owner",
+                    allowed=False,
+                    actor=f"owner:{user_id}",
+                )
+            return f"{'Allowed' if allowed else 'Denied'} {channel}:{external_id}"
 
         lock = await self.lock_manager.get_lock(f"telegram:{chat_id}")
         async with lock:
@@ -130,6 +167,8 @@ def build_telegram_runtime(config_path: str | None = None) -> TelegramRuntime:
     register_status_tools(registry, session_factory, router)
 
     admin_service = AdminService(cfg=cfg, db_session_factory=session_factory, provider_router=router)
+    admin_service.get_or_create_runtime_state()
+    admin_service.bootstrap_telegram_grants()
     state = admin_service.get_or_create_permission_state()
     try:
         profile = PermissionProfile(state.current_profile)
@@ -183,17 +222,24 @@ def build_telegram_runtime(config_path: str | None = None) -> TelegramRuntime:
         retry_policy=tool_retry,
         breaker_registry=tool_breakers,
         policy_engine=policy_engine,
-        safe_mode_getter=lambda: bool(cfg.runtime.safe_mode),
+        safe_mode_getter=admin_service.get_safe_mode,
         create_confirmation=_create_confirmation,
     )
 
-    pipeline = TaskPipeline(cfg=cfg, db_session_factory=session_factory, tool_executor=executor, provider_router=router)
+    pipeline = TaskPipeline(
+        cfg=cfg,
+        db_session_factory=session_factory,
+        tool_executor=executor,
+        provider_router=router,
+        safe_mode_getter=admin_service.get_safe_mode,
+    )
 
     return TelegramRuntime(
-        auth=TelegramAllowlistAuth(cfg.channels.telegram),
+        auth=TelegramAllowlistAuth(cfg.channels.telegram, admin_service=admin_service),
         lock_manager=SessionLockManager(),
         pipeline=pipeline,
         tool_executor=executor,
+        admin_service=admin_service,
         db_session_factory=session_factory,
         logger=logger,
     )

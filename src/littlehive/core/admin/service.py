@@ -4,7 +4,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from time import monotonic
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, select
 
 from littlehive import __version__
 from littlehive.core.permissions.policy_engine import PermissionProfile, PolicyEngine
@@ -14,6 +14,10 @@ from littlehive.db.models import (
     PendingConfirmation,
     PermissionAuditEvent,
     PermissionState,
+    Principal,
+    PrincipalGrant,
+    RuntimeControlEvent,
+    RuntimeState,
     SessionSummary,
     Task,
     TaskTraceSummary,
@@ -83,6 +87,229 @@ class AdminService:
             db.commit()
             db.refresh(row)
             return row
+
+    def get_or_create_runtime_state(self) -> RuntimeState:
+        with self.db_session_factory() as db:
+            row = db.execute(select(RuntimeState).order_by(RuntimeState.id.asc())).scalar_one_or_none()
+            if row is None:
+                row = RuntimeState(
+                    safe_mode=1 if bool(self.cfg.runtime.safe_mode) else 0,
+                    updated_by="system",
+                    updated_at=_utcnow(),
+                )
+                db.add(row)
+                db.commit()
+                db.refresh(row)
+            return row
+
+    def get_safe_mode(self) -> bool:
+        row = self.get_or_create_runtime_state()
+        return bool(row.safe_mode)
+
+    def update_safe_mode(self, safe_mode: bool, actor: str) -> RuntimeState:
+        with self.db_session_factory() as db:
+            row = db.execute(select(RuntimeState).order_by(RuntimeState.id.asc())).scalar_one_or_none()
+            if row is None:
+                row = RuntimeState(
+                    safe_mode=1 if safe_mode else 0,
+                    updated_by=actor,
+                    updated_at=_utcnow(),
+                )
+                db.add(row)
+            else:
+                row.safe_mode = 1 if safe_mode else 0
+                row.updated_by = actor
+                row.updated_at = _utcnow()
+            db.commit()
+            db.refresh(row)
+            return row
+
+    def ensure_principal(self, *, channel: str, external_id: str, display_name: str = "") -> Principal:
+        norm_channel = (channel or "").strip().lower()[:32]
+        norm_external = (external_id or "").strip()[:128]
+        if not norm_channel or not norm_external:
+            raise ValueError("channel and external_id are required")
+
+        with self.db_session_factory() as db:
+            row = db.execute(
+                select(Principal).where(and_(Principal.channel == norm_channel, Principal.external_id == norm_external))
+            ).scalar_one_or_none()
+            if row is None:
+                row = Principal(
+                    channel=norm_channel,
+                    external_id=norm_external,
+                    display_name=(display_name or "")[:128],
+                    created_at=_utcnow(),
+                    updated_at=_utcnow(),
+                )
+                db.add(row)
+            elif display_name:
+                row.display_name = display_name[:128]
+                row.updated_at = _utcnow()
+            db.commit()
+            db.refresh(row)
+            return row
+
+    def set_principal_grant(
+        self,
+        *,
+        channel: str,
+        external_id: str,
+        grant_type: str,
+        allowed: bool,
+        actor: str,
+        display_name: str = "",
+    ) -> PrincipalGrant:
+        principal = self.ensure_principal(channel=channel, external_id=external_id, display_name=display_name)
+        gtype = (grant_type or "chat_access").strip().lower()[:64]
+        with self.db_session_factory() as db:
+            row = db.execute(
+                select(PrincipalGrant)
+                .where(PrincipalGrant.principal_id == principal.id)
+                .where(PrincipalGrant.grant_type == gtype)
+            ).scalar_one_or_none()
+            if row is None:
+                row = PrincipalGrant(
+                    principal_id=principal.id,
+                    grant_type=gtype,
+                    is_allowed=1 if allowed else 0,
+                    updated_by=actor[:128],
+                    updated_at=_utcnow(),
+                )
+                db.add(row)
+            else:
+                row.is_allowed = 1 if allowed else 0
+                row.updated_by = actor[:128]
+                row.updated_at = _utcnow()
+            db.commit()
+            db.refresh(row)
+            return row
+
+    def _get_principal_grant(self, *, channel: str, external_id: str, grant_type: str) -> PrincipalGrant | None:
+        norm_channel = (channel or "").strip().lower()[:32]
+        norm_external = (external_id or "").strip()[:128]
+        gtype = (grant_type or "chat_access").strip().lower()[:64]
+        with self.db_session_factory() as db:
+            principal = db.execute(
+                select(Principal).where(and_(Principal.channel == norm_channel, Principal.external_id == norm_external))
+            ).scalar_one_or_none()
+            if principal is None:
+                return None
+            return db.execute(
+                select(PrincipalGrant)
+                .where(PrincipalGrant.principal_id == principal.id)
+                .where(PrincipalGrant.grant_type == gtype)
+            ).scalar_one_or_none()
+
+    def is_principal_owner(self, *, channel: str, external_id: str, fallback_owner_external_id: str | None = None) -> bool:
+        owner = self._get_principal_grant(channel=channel, external_id=external_id, grant_type="owner")
+        if owner is not None:
+            return bool(owner.is_allowed)
+        if fallback_owner_external_id is None:
+            return False
+        return external_id == fallback_owner_external_id
+
+    def is_principal_chat_allowed(
+        self,
+        *,
+        channel: str,
+        external_id: str,
+        fallback_allowed_external_ids: set[str] | None = None,
+    ) -> bool:
+        grant = self._get_principal_grant(channel=channel, external_id=external_id, grant_type="chat_access")
+        if grant is not None:
+            return bool(grant.is_allowed)
+        return external_id in (fallback_allowed_external_ids or set())
+
+    def bootstrap_telegram_grants(self) -> None:
+        cfg = self.cfg.channels.telegram
+        owner = cfg.owner_user_id
+        if owner is not None:
+            sid = str(int(owner))
+            self.set_principal_grant(
+                channel="telegram",
+                external_id=sid,
+                grant_type="chat_access",
+                allowed=True,
+                actor="bootstrap",
+            )
+            self.set_principal_grant(
+                channel="telegram",
+                external_id=sid,
+                grant_type="owner",
+                allowed=True,
+                actor="bootstrap",
+            )
+        for uid in cfg.allow_user_ids:
+            self.set_principal_grant(
+                channel="telegram",
+                external_id=str(int(uid)),
+                grant_type="chat_access",
+                allowed=True,
+                actor="bootstrap",
+            )
+
+    def list_principals(self, *, channel: str | None = None, limit: int = 200) -> list[dict]:
+        with self.db_session_factory() as db:
+            q = select(Principal).order_by(Principal.id.asc()).limit(limit)
+            if channel:
+                q = q.where(Principal.channel == channel.lower())
+            rows = db.execute(q).scalars().all()
+            out: list[dict] = []
+            for row in rows:
+                grants = db.execute(select(PrincipalGrant).where(PrincipalGrant.principal_id == row.id)).scalars().all()
+                out.append(
+                    {
+                        "id": row.id,
+                        "channel": row.channel,
+                        "external_id": row.external_id,
+                        "display_name": row.display_name,
+                        "grants": {g.grant_type: bool(g.is_allowed) for g in grants},
+                        "created_at": row.created_at,
+                        "updated_at": row.updated_at,
+                    }
+                )
+            return out
+
+    def request_control_event(self, *, event_type: str, payload: dict | None, actor: str) -> RuntimeControlEvent:
+        with self.db_session_factory() as db:
+            row = RuntimeControlEvent(
+                event_type=(event_type or "restart_services")[:64],
+                payload_json=json.dumps(payload or {}, ensure_ascii=True),
+                status="pending",
+                requested_by=actor[:128],
+                detail="",
+                created_at=_utcnow(),
+                processed_at=None,
+            )
+            db.add(row)
+            db.commit()
+            db.refresh(row)
+            return row
+
+    def mark_control_event_processed(self, event_id: int, *, status: str, detail: str) -> RuntimeControlEvent | None:
+        with self.db_session_factory() as db:
+            row = db.execute(select(RuntimeControlEvent).where(RuntimeControlEvent.id == event_id)).scalar_one_or_none()
+            if row is None:
+                return None
+            row.status = status[:32]
+            row.detail = detail[:800]
+            row.processed_at = _utcnow()
+            db.commit()
+            db.refresh(row)
+            return row
+
+    def list_pending_control_events(self, *, event_type: str | None = None, limit: int = 50) -> list[RuntimeControlEvent]:
+        with self.db_session_factory() as db:
+            q = (
+                select(RuntimeControlEvent)
+                .where(RuntimeControlEvent.status == "pending")
+                .order_by(RuntimeControlEvent.id.asc())
+                .limit(limit)
+            )
+            if event_type:
+                q = q.where(RuntimeControlEvent.event_type == event_type)
+            return db.execute(q).scalars().all()
 
     def create_confirmation(
         self,
@@ -159,7 +386,7 @@ class AdminService:
             "version": __version__,
             "environment": self.cfg.environment,
             "instance": self.cfg.instance.name,
-            "safe_mode": bool(self.cfg.runtime.safe_mode),
+            "safe_mode": self.get_safe_mode(),
             "active_tasks": active_tasks,
             "total_tasks": total_tasks,
             "providers_configured": providers,
@@ -267,7 +494,7 @@ class AdminService:
 
     def runtime_summary(self) -> dict:
         data = runtime_stats(self.db_session_factory)
-        data["safe_mode"] = bool(self.cfg.runtime.safe_mode)
+        data["safe_mode"] = self.get_safe_mode()
         return data
 
     def list_users(self, limit: int = 100) -> list[dict]:

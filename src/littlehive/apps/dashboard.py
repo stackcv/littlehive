@@ -178,7 +178,7 @@ def _render_failures(runtime) -> None:
     is_prod = str(runtime.cfg.environment).strip().lower() == "prod"
     if not is_prod:
         ui.label(f"Environment: {runtime.cfg.environment}")
-        ui.label(f"Safe mode: {runtime.cfg.runtime.safe_mode}")
+        ui.label(f"Safe mode: {runtime.admin_service.get_safe_mode()}")
 
     rows = runtime.admin_service.failure_summary(limit=30)
     _build_table(
@@ -387,7 +387,7 @@ def main() -> int:
         print(
             "dashboard-smoke-ok "
             f"profile={runtime.policy_engine.profile.value} "
-            f"safe_mode={runtime.cfg.runtime.safe_mode} read_only={state.read_only}"
+            f"safe_mode={runtime.admin_service.get_safe_mode()} read_only={state.read_only}"
         )
         return 0
 

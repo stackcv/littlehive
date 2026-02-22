@@ -15,6 +15,8 @@ from littlehive.core.admin.schemas import (
     ConfirmationDecisionRequest,
     PermissionProfileResponse,
     PermissionProfileUpdateRequest,
+    PrincipalGrantUpdateRequest,
+    RuntimeApplyRequest,
     UserProfileModel,
     UserProfileUpdateRequest,
 )
@@ -39,7 +41,7 @@ def create_app(config_path: str | None = None) -> FastAPI:
     def health() -> dict:
         return {
             "status": "ok",
-            "safe_mode": bool(runtime.cfg.runtime.safe_mode),
+            "safe_mode": runtime.admin_service.get_safe_mode(),
             "profile": runtime.policy_engine.profile.value,
             "version": __version__,
         }
@@ -69,7 +71,7 @@ def create_app(config_path: str | None = None) -> FastAPI:
                 {"agent_id": "memory_agent", "enabled": True},
                 {"agent_id": "reply_agent", "enabled": True},
             ],
-            "safe_mode": bool(runtime.cfg.runtime.safe_mode),
+            "safe_mode": runtime.admin_service.get_safe_mode(),
         }
 
     @app.patch("/agents/{agent_id}")
@@ -78,8 +80,8 @@ def create_app(config_path: str | None = None) -> FastAPI:
         if agent_id != "runtime":
             raise HTTPException(status_code=400, detail="only_runtime_agent_patch_supported")
         if payload.safe_mode is not None:
-            runtime.cfg.runtime.safe_mode = bool(payload.safe_mode)
-        return {"agent_id": agent_id, "safe_mode": bool(runtime.cfg.runtime.safe_mode)}
+            runtime.admin_service.update_safe_mode(bool(payload.safe_mode), actor="api")
+        return {"agent_id": agent_id, "safe_mode": runtime.admin_service.get_safe_mode()}
 
     @app.get("/tasks")
     def tasks(
@@ -108,6 +110,29 @@ def create_app(config_path: str | None = None) -> FastAPI:
     @app.get("/users")
     def users(limit: int = Query(default=100, ge=1, le=500)) -> dict:
         return {"items": runtime.admin_service.list_users(limit=limit)}
+
+    @app.get("/principals")
+    def principals(channel: str | None = Query(default=None), limit: int = Query(default=200, ge=1, le=1000)) -> dict:
+        return {"items": runtime.admin_service.list_principals(channel=channel, limit=limit)}
+
+    @app.post("/principals/grants")
+    def update_principal_grant(payload: PrincipalGrantUpdateRequest, _=Depends(_require_admin_token)) -> dict:
+        _assert_mutations_allowed()
+        row = runtime.admin_service.set_principal_grant(
+            channel=payload.channel,
+            external_id=payload.external_id,
+            grant_type=payload.grant_type,
+            allowed=payload.allowed,
+            actor=payload.actor,
+            display_name=payload.display_name,
+        )
+        return {
+            "id": row.id,
+            "grant_type": row.grant_type,
+            "allowed": bool(row.is_allowed),
+            "updated_by": row.updated_by,
+            "updated_at": row.updated_at,
+        }
 
     @app.get("/users/{user_id}/profile", response_model=UserProfileModel)
     def get_user_profile(user_id: int) -> UserProfileModel:
@@ -139,7 +164,7 @@ def create_app(config_path: str | None = None) -> FastAPI:
         runtime.policy_engine.set_profile(PermissionProfile(row.current_profile))
         return PermissionProfileResponse(
             current_profile=PermissionProfile(row.current_profile),
-            safe_mode=bool(runtime.cfg.runtime.safe_mode),
+            safe_mode=runtime.admin_service.get_safe_mode(),
             updated_by=row.updated_by,
             updated_at=row.updated_at,
         )
@@ -151,10 +176,36 @@ def create_app(config_path: str | None = None) -> FastAPI:
         runtime.policy_engine.set_profile(payload.profile)
         return PermissionProfileResponse(
             current_profile=PermissionProfile(row.current_profile),
-            safe_mode=bool(runtime.cfg.runtime.safe_mode),
+            safe_mode=runtime.admin_service.get_safe_mode(),
             updated_by=row.updated_by,
             updated_at=row.updated_at,
         )
+
+    @app.post("/runtime/apply")
+    def runtime_apply(payload: RuntimeApplyRequest, _=Depends(_require_admin_token)) -> dict:
+        _assert_mutations_allowed()
+        actor = payload.actor or "api"
+        if payload.safe_mode is not None:
+            runtime.admin_service.update_safe_mode(payload.safe_mode, actor=actor)
+        if payload.profile is not None:
+            row = runtime.admin_service.update_profile(payload.profile, actor=actor)
+            runtime.policy_engine.set_profile(PermissionProfile(row.current_profile))
+
+        event_id = None
+        if payload.request_restart:
+            event = runtime.admin_service.request_control_event(
+                event_type="restart_services",
+                payload={"source": "api.runtime_apply"},
+                actor=actor,
+            )
+            event_id = event.id
+
+        return {
+            "safe_mode": runtime.admin_service.get_safe_mode(),
+            "profile": runtime.policy_engine.profile.value,
+            "restart_requested": bool(payload.request_restart),
+            "control_event_id": event_id,
+        }
 
     @app.get("/usage")
     def usage() -> dict:

@@ -184,6 +184,15 @@ class PermissionState(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
 
 
+class RuntimeState(Base):
+    __tablename__ = "runtime_state"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    safe_mode: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    updated_by: Mapped[str] = mapped_column(String(128), nullable=False, default="system")
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+
+
 class PermissionAuditEvent(Base):
     __tablename__ = "permission_audit_events"
 
@@ -210,3 +219,40 @@ class PendingConfirmation(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     decided_by: Mapped[str] = mapped_column(String(128), nullable=False, default="")
+
+
+class Principal(Base):
+    __tablename__ = "principals"
+    __table_args__ = (UniqueConstraint("channel", "external_id", name="uq_principals_channel_external"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    channel: Mapped[str] = mapped_column(String(32), nullable=False, default="telegram")
+    external_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    display_name: Mapped[str] = mapped_column(String(128), nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+
+
+class PrincipalGrant(Base):
+    __tablename__ = "principal_grants"
+    __table_args__ = (UniqueConstraint("principal_id", "grant_type", name="uq_principal_grants_type"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    principal_id: Mapped[int] = mapped_column(ForeignKey("principals.id"), nullable=False)
+    grant_type: Mapped[str] = mapped_column(String(64), nullable=False, default="chat_access")
+    is_allowed: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    updated_by: Mapped[str] = mapped_column(String(128), nullable=False, default="system")
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+
+
+class RuntimeControlEvent(Base):
+    __tablename__ = "runtime_control_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    event_type: Mapped[str] = mapped_column(String(64), nullable=False, default="restart_services")
+    payload_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending")
+    requested_by: Mapped[str] = mapped_column(String(128), nullable=False, default="system")
+    detail: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

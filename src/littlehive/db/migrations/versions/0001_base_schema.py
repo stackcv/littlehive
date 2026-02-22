@@ -176,6 +176,14 @@ def upgrade() -> None:
     )
 
     op.create_table(
+        "runtime_state",
+        sa.Column("id", sa.Integer(), primary_key=True),
+        sa.Column("safe_mode", sa.Integer(), nullable=False, server_default="1"),
+        sa.Column("updated_by", sa.String(length=128), nullable=False, server_default="system"),
+        sa.Column("updated_at", sa.DateTime(), nullable=False),
+    )
+
+    op.create_table(
         "permission_audit_events",
         sa.Column("id", sa.Integer(), primary_key=True),
         sa.Column("actor", sa.String(length=128), nullable=False, server_default="system"),
@@ -202,11 +210,49 @@ def upgrade() -> None:
     )
     op.create_index("ix_pending_confirmations_status", "pending_confirmations", ["status"], unique=False)
 
+    op.create_table(
+        "principals",
+        sa.Column("id", sa.Integer(), primary_key=True),
+        sa.Column("channel", sa.String(length=32), nullable=False, server_default="telegram"),
+        sa.Column("external_id", sa.String(length=128), nullable=False),
+        sa.Column("display_name", sa.String(length=128), nullable=False, server_default=""),
+        sa.Column("created_at", sa.DateTime(), nullable=False),
+        sa.Column("updated_at", sa.DateTime(), nullable=False),
+        sa.UniqueConstraint("channel", "external_id", name="uq_principals_channel_external"),
+    )
+
+    op.create_table(
+        "principal_grants",
+        sa.Column("id", sa.Integer(), primary_key=True),
+        sa.Column("principal_id", sa.Integer(), sa.ForeignKey("principals.id"), nullable=False),
+        sa.Column("grant_type", sa.String(length=64), nullable=False, server_default="chat_access"),
+        sa.Column("is_allowed", sa.Integer(), nullable=False, server_default="1"),
+        sa.Column("updated_by", sa.String(length=128), nullable=False, server_default="system"),
+        sa.Column("updated_at", sa.DateTime(), nullable=False),
+        sa.UniqueConstraint("principal_id", "grant_type", name="uq_principal_grants_type"),
+    )
+
+    op.create_table(
+        "runtime_control_events",
+        sa.Column("id", sa.Integer(), primary_key=True),
+        sa.Column("event_type", sa.String(length=64), nullable=False, server_default="restart_services"),
+        sa.Column("payload_json", sa.Text(), nullable=False, server_default="{}"),
+        sa.Column("status", sa.String(length=32), nullable=False, server_default="pending"),
+        sa.Column("requested_by", sa.String(length=128), nullable=False, server_default="system"),
+        sa.Column("detail", sa.Text(), nullable=False, server_default=""),
+        sa.Column("created_at", sa.DateTime(), nullable=False),
+        sa.Column("processed_at", sa.DateTime(), nullable=True),
+    )
+
 
 def downgrade() -> None:
+    op.drop_table("runtime_control_events")
+    op.drop_table("principal_grants")
+    op.drop_table("principals")
     op.drop_index("ix_pending_confirmations_status", table_name="pending_confirmations")
     op.drop_table("pending_confirmations")
     op.drop_table("permission_audit_events")
+    op.drop_table("runtime_state")
     op.drop_table("permission_state")
     op.drop_table("task_trace_summaries")
     op.drop_table("failure_fingerprints")
