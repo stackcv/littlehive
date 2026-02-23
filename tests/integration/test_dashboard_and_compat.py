@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 import pytest
 
@@ -92,7 +92,7 @@ def _runtime(tmp_path):
                     tool_name=tool_name,
                     status=status,
                     detail=detail,
-                    created_at=datetime.utcnow(),
+                    created_at=datetime.now(UTC),
                 )
             )
             db.commit()

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 
 import pytest
 
@@ -93,7 +93,7 @@ def runtime_fixture(tmp_path):
                     tool_name=tool_name,
                     status=status,
                     detail=detail,
-                    created_at=datetime.utcnow(),
+                    created_at=datetime.now(UTC),
                 )
             )
             db.commit()
