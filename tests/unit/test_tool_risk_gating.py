@@ -39,7 +39,7 @@ def test_tool_risk_gating_and_confirmation_flow():
 
     executor = ToolExecutor(
         registry=registry,
-        logger=get_logger("test.phase45.risk"),
+        logger=get_logger("test.risk.gating"),
         policy_engine=PolicyEngine(PermissionProfile.EXECUTE_SAFE),
         safe_mode_getter=lambda: True,
         create_confirmation=create_confirmation,
@@ -74,7 +74,7 @@ def test_tool_risk_blocked_in_read_only():
 
     executor = ToolExecutor(
         registry=registry,
-        logger=get_logger("test.phase45.risk.block"),
+        logger=get_logger("test.risk.gating.block"),
         policy_engine=PolicyEngine(PermissionProfile.READ_ONLY),
     )
     ctx = ToolCallContext(session_db_id=1, user_db_id=1, task_id=1, trace_id="x")

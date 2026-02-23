@@ -26,7 +26,25 @@ class PlannerAgent:
         reserved_output_tokens: int,
     ) -> PlannerOutput:
         text = user_text.lower().strip()
-        tool_needed = any(tok in text for tok in ["status", "remember", "search", "task", "memory", "fix"]) or text.startswith("/")
+        tool_needed = any(
+            tok in text
+            for tok in [
+                "status",
+                "remember",
+                "search",
+                "task",
+                "memory",
+                "fix",
+                "weather",
+                "forecast",
+                "temperature",
+                "rain",
+                "humidity",
+                "wind",
+                "news",
+                "latest",
+            ]
+        ) or text.startswith("/")
         steps = ["interpret_intent", "prepare_response"]
         tool_query = ""
         transfer = None

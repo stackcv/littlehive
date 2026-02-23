@@ -219,6 +219,10 @@ def create_app(config_path: str | None = None) -> FastAPI:
     def diagnostics_budgets() -> dict:
         return runtime.admin_service.usage_summary()
 
+    @app.get("/diagnostics/tool-quality")
+    def diagnostics_tool_quality() -> dict:
+        return runtime.admin_service.tool_retrieval_quality_summary()
+
     @app.get("/confirmations")
     def confirmations() -> dict:
         rows = runtime.admin_service.list_pending_confirmations()

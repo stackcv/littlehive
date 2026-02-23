@@ -35,6 +35,7 @@ from littlehive.core.telemetry.tracing import TraceContext, trace_event
 from littlehive.core.tools.base import ToolCallContext
 from littlehive.core.tools.executor import ToolExecutor
 from littlehive.db.models import Message, ProviderCall, Session, Task, TransferEvent, User
+from littlehive.db.models import ToolCall
 
 
 def _utcnow() -> datetime:
@@ -68,7 +69,11 @@ class TaskPipeline:
         self.orchestrator = OrchestratorAgent()
         self.memory_agent = MemoryAgent(tool_executor)
         self.planner = PlannerAgent()
-        self.execution = ExecutionAgent(tool_executor.registry, tool_executor)
+        self.execution = ExecutionAgent(
+            tool_executor.registry,
+            tool_executor,
+            history_loader=self._recent_tool_names,
+        )
         self.reply_agent = ReplyAgent()
         self._task_reuse_window = timedelta(minutes=45)
         self._safe_mode_getter = safe_mode_getter or (lambda: bool(self.cfg.runtime.safe_mode))
@@ -125,6 +130,22 @@ class TaskPipeline:
             )
             rows.reverse()
             return [ChatTurn(role=m.role, content=m.content[:500]) for m in rows]
+
+    def _recent_tool_names(self, session_id: int, cap: int = 8) -> list[str]:
+        with self.db_session_factory() as db:
+            rows = (
+                db.execute(
+                    select(ToolCall)
+                    .where(ToolCall.session_id == session_id)
+                    .where(ToolCall.status == "ok")
+                    .order_by(ToolCall.id.desc())
+                    .limit(cap)
+                )
+                .scalars()
+                .all()
+            )
+        rows.reverse()
+        return [r.tool_name for r in rows if isinstance(r.tool_name, str) and r.tool_name.strip()]
 
     def _persist_message(self, session_id: int, role: str, content: str, trace_id: str) -> None:
         with self.db_session_factory() as db:
@@ -281,6 +302,7 @@ class TaskPipeline:
                 budget=budget,
                 task_payload="determine whether transfer to execution is needed",
                 tool_context_mode="routing",
+                allowed_tool_names=self.tool_executor.list_allowed_tool_names(),
                 tool_registry=self.tool_executor.registry,
                 tool_query=user_text,
                 extra_metadata={"phase": "planner", **user_meta},
@@ -334,6 +356,7 @@ class TaskPipeline:
                     handoff_payload=planner_output.transfer.model_dump_json(),
                     tool_context_mode="invocation",
                     selected_tool_names=[],
+                    allowed_tool_names=self.tool_executor.list_allowed_tool_names(),
                     tool_registry=self.tool_executor.registry,
                     tool_query=planner_output.tool_intent_query,
                     extra_metadata={"phase": "execution", **user_meta},
@@ -363,8 +386,19 @@ class TaskPipeline:
                         "routing_count": exec_result.injection_log.get("routing_count", 0),
                         "invocation_count": exec_result.injection_log.get("invocation_count", 0),
                         "full_schema_count": exec_result.injection_log.get("full_schema_count", 0),
+                        "confidence": exec_result.confidence,
+                        "needs_clarification": int(exec_result.needs_clarification),
                     },
                 )
+                if exec_result.needs_clarification:
+                    trace_event(
+                        self.logger,
+                        trace,
+                        event="tool_selection",
+                        status="low_confidence",
+                        extra={"confidence": exec_result.confidence},
+                    )
+                    return exec_result.clarification_question
                 execution_summary = f"tools={exec_result.selected_tools}; outputs={exec_result.outputs}"
 
             reply_compiled = self.compiler.compile(
@@ -398,6 +432,19 @@ class TaskPipeline:
                 prompt=reply_compiled.prompt_text,
                 max_output_tokens=self.cfg.context.reserved_output_tokens,
             )
+            if bool(getattr(self.cfg.telemetry, "log_compiled_prompts", False)):
+                cap = int(getattr(self.cfg.telemetry, "prompt_log_max_chars", 4000))
+                prompt_text = reply_compiled.prompt_text
+                trace_event(
+                    self.logger,
+                    trace,
+                    event="llm_prompt_compiled",
+                    status="debug",
+                    extra={
+                        "prompt_chars": len(prompt_text),
+                        "prompt_preview": prompt_text[:cap],
+                    },
+                )
             provider_response_text = ""
             fallback_order = list(self.cfg.providers.fallback_order)
             fingerprint_id = None

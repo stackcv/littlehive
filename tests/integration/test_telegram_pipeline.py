@@ -62,7 +62,7 @@ class FakeUpdate:
 
 @pytest.fixture
 def runtime_fixture(tmp_path):
-    db_file = tmp_path / "phase1_test.db"
+    db_file = tmp_path / "telegram_pipeline.db"
     session_factory, engine = create_session_factory(f"sqlite:///{db_file}")
     import littlehive.db.models  # noqa: F401
 

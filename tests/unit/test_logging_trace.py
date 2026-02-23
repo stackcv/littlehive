@@ -11,7 +11,7 @@ def test_trace_event_emits_structured_fields(capsys):
         task_id="task1",
         session_id="sess1",
         agent_id="agent1",
-        phase="phase0",
+        phase="baseline",
     )
 
     trace_event(logger, ctx, event="hello", status="ok", extra={"k": "v"})

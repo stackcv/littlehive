@@ -16,11 +16,12 @@ from littlehive.core.providers.router import ProviderRouter
 from littlehive.core.runtime.circuit_breaker import BreakerRegistry
 from littlehive.core.runtime.locks import SessionLockManager
 from littlehive.core.runtime.retries import RetryPolicy
-from littlehive.core.telemetry.diagnostics import budget_stats, failure_summary, runtime_stats
+from littlehive.core.telemetry.diagnostics import budget_stats, failure_summary, runtime_stats, tool_retrieval_quality_stats
 from littlehive.core.telemetry.logging import get_logger
 from littlehive.core.telemetry.tracing import recent_traces
 from littlehive.core.tools.base import ToolCallContext
 from littlehive.core.tools.builtin.memory_tools import register_memory_tools
+from littlehive.core.tools.builtin.weather_tools import register_weather_tools
 from littlehive.core.tools.builtin.status_tools import register_status_tools
 from littlehive.core.tools.builtin.task_tools import register_task_tools
 from littlehive.core.tools.executor import ToolExecutor
@@ -74,12 +75,14 @@ class TelegramRuntime:
             traces = recent_traces(limit=5)
             rt = runtime_stats(self.db_session_factory)
             bs = budget_stats(self.db_session_factory)
+            tq = tool_retrieval_quality_stats(self.db_session_factory)
             failures = failure_summary(self.db_session_factory, limit=3)
             trace_text = "\n".join(f"{t['event']}:{t['status']}:{t['task_id']}" for t in traces) if traces else "none"
             return (
                 f"traces:\n{trace_text}\n"
                 f"runtime={rt['tasks_by_status']}\n"
                 f"budget_avg={bs['avg_estimated_prompt_tokens']} trims={bs['trim_event_count']}\n"
+                f"tool_quality=success:{tq['success_rate']} blocked:{tq['blocked_rate']} error:{tq['error_rate']}\n"
                 f"failures={len(failures)}"
             )
 
@@ -165,6 +168,13 @@ def build_telegram_runtime(config_path: str | None = None) -> TelegramRuntime:
     register_memory_tools(registry, session_factory)
     register_task_tools(registry, session_factory)
     register_status_tools(registry, session_factory, router)
+    register_weather_tools(
+        registry,
+        enabled=bool(cfg.tools.weather.enabled),
+        provider=cfg.tools.weather.provider,
+        api_key_env=cfg.tools.weather.api_key_env,
+        timeout_seconds=int(cfg.tools.weather.timeout_seconds),
+    )
 
     admin_service = AdminService(cfg=cfg, db_session_factory=session_factory, provider_router=router)
     admin_service.get_or_create_runtime_state()

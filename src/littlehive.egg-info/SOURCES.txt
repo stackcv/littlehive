@@ -95,6 +95,8 @@ src/littlehive/core/tools/builtin/agent_tools.py
 src/littlehive/core/tools/builtin/memory_tools.py
 src/littlehive/core/tools/builtin/status_tools.py
 src/littlehive/core/tools/builtin/task_tools.py
+src/littlehive/core/tools/builtin/weather_tools.py
+src/littlehive/core/tools/builtin/web_tools.py
 src/littlehive/db/__init__.py
 src/littlehive/db/models.py
 src/littlehive/db/session.py

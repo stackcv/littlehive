@@ -81,3 +81,27 @@ def test_diag_budget_stats_handles_missing_data(monkeypatch, capsys):
     assert rc == 0
     assert "budget-stats" in out
     assert "trace_count=0" in out
+
+
+def test_diag_tool_quality_output(monkeypatch, capsys):
+    monkeypatch.setattr("littlehive.apps.diagnostics_cli.build_telegram_runtime", lambda config_path=None: FakeRuntime())
+    monkeypatch.setattr("littlehive.apps.diagnostics_cli.load_app_config", lambda instance_path=None: SimpleNamespace(runtime=SimpleNamespace(safe_mode=True), instance=SimpleNamespace(name="x"), environment="dev"))
+    monkeypatch.setattr(
+        "littlehive.apps.diagnostics_cli.tool_retrieval_quality_stats",
+        lambda db_session_factory: {
+            "total_tool_calls": 10,
+            "ok_calls": 8,
+            "blocked_calls": 1,
+            "error_calls": 1,
+            "waiting_confirmation_calls": 0,
+            "success_rate": 0.8,
+            "blocked_rate": 0.1,
+            "error_rate": 0.1,
+        },
+    )
+    monkeypatch.setattr("sys.argv", ["littlehive-diag", "--tool-quality"])
+    rc = diagnostics_cli.main()
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "tool-quality" in out
+    assert "success_rate=0.8" in out

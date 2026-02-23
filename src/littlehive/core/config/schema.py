@@ -34,6 +34,8 @@ class ContextConfig(BaseModel):
 class TelemetryConfig(BaseModel):
     log_level: str = "INFO"
     json_logs: bool = True
+    log_compiled_prompts: bool = False
+    prompt_log_max_chars: int = 4000
 
 
 class DatabaseConfig(BaseModel):
@@ -68,6 +70,17 @@ class ChannelsConfig(BaseModel):
     telegram: TelegramChannelConfig = Field(default_factory=TelegramChannelConfig)
 
 
+class WeatherToolConfig(BaseModel):
+    enabled: bool = False
+    provider: str = "weatherapi"
+    api_key_env: str = "LITTLEHIVE_WEATHER_API_KEY"
+    timeout_seconds: int = 10
+
+
+class ToolsConfig(BaseModel):
+    weather: WeatherToolConfig = Field(default_factory=WeatherToolConfig)
+
+
 class AppConfig(BaseModel):
     instance: InstanceConfig = Field(default_factory=InstanceConfig)
     timezone: str = "Asia/Kolkata"
@@ -78,6 +91,7 @@ class AppConfig(BaseModel):
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
     providers: ProvidersConfig = Field(default_factory=ProvidersConfig)
     channels: ChannelsConfig = Field(default_factory=ChannelsConfig)
+    tools: ToolsConfig = Field(default_factory=ToolsConfig)
     dashboard_host: str = "127.0.0.1"
     dashboard_port: int = 8666
     admin_token_env: str = "LITTLEHIVE_ADMIN_TOKEN"

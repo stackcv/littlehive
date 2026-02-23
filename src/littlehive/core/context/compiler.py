@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import re
+from difflib import SequenceMatcher
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Iterable
 
 from littlehive.core.context.budget import TokenBudget, TokenBudgetPreflight, PreflightResult
 from littlehive.core.tools.injection import build_tool_docs_bundle
@@ -30,10 +32,84 @@ class CompiledContext:
 class ContextCompiler:
     def __init__(self) -> None:
         self.preflight = TokenBudgetPreflight()
+        self._boilerplate_hints = [
+            "text-based ai",
+            "do not have direct access",
+            "don't have direct access",
+            "real-time information",
+            "cannot access the web",
+            "can't access the web",
+        ]
 
     @staticmethod
     def _estimate_tokens(text: str) -> int:
         return max(1, len(text) // 4)
+
+    @staticmethod
+    def _normalize_text(text: str) -> str:
+        value = (text or "").strip().lower()
+        value = re.sub(r"^(assistant|user)\s*:\s*", "", value)
+        value = re.sub(r"\s+", " ", value)
+        value = re.sub(r"[^a-z0-9\s]", "", value)
+        return value.strip()
+
+    def _is_boilerplate_disclaimer(self, text: str) -> bool:
+        normalized = self._normalize_text(text)
+        return any(hint in normalized for hint in self._boilerplate_hints)
+
+    @staticmethod
+    def _is_duplicate_signature(sig: str, seen: list[str], threshold: float = 0.92) -> bool:
+        if not sig:
+            return True
+        for prior in seen:
+            if sig == prior:
+                return True
+            if SequenceMatcher(a=sig, b=prior).ratio() >= threshold:
+                return True
+        return False
+
+    def _dedupe_recent_turns(self, turns: list[ChatTurn]) -> tuple[list[ChatTurn], list[str]]:
+        kept_rev: list[ChatTurn] = []
+        seen: list[str] = []
+        disclaimer_kept = False
+        for turn in reversed(turns):
+            content = (turn.content or "").strip()
+            if not content:
+                continue
+            sig = self._normalize_text(content)
+            is_disclaimer = self._is_boilerplate_disclaimer(content)
+            if is_disclaimer and disclaimer_kept:
+                continue
+            if self._is_duplicate_signature(sig, seen):
+                continue
+            kept_rev.append(ChatTurn(role=turn.role, content=content))
+            seen.append(sig)
+            if is_disclaimer:
+                disclaimer_kept = True
+        kept = list(reversed(kept_rev))
+        return kept, seen
+
+    def _dedupe_memories(self, memories: list[str], turn_signatures: list[str]) -> list[str]:
+        kept: list[str] = []
+        seen = list(turn_signatures)
+        disclaimer_seen = any(self._is_boilerplate_disclaimer(sig) for sig in turn_signatures)
+        for item in memories:
+            text = (item or "").strip()
+            if not text:
+                continue
+            sig = self._normalize_text(text)
+            if not sig:
+                continue
+            is_disclaimer = self._is_boilerplate_disclaimer(text)
+            if is_disclaimer and disclaimer_seen:
+                continue
+            if self._is_duplicate_signature(sig, seen, threshold=0.9):
+                continue
+            kept.append(text)
+            seen.append(sig)
+            if is_disclaimer:
+                disclaimer_seen = True
+        return kept
 
     def compile(
         self,
@@ -48,6 +124,7 @@ class ContextCompiler:
         handoff_payload: str | None = None,
         tool_context_mode: str = "none",
         selected_tool_names: list[str] | None = None,
+        allowed_tool_names: Iterable[str] | None = None,
         tool_registry: ToolRegistry | None = None,
         tool_query: str = "",
         extra_metadata: dict[str, Any] | None = None,
@@ -55,6 +132,16 @@ class ContextCompiler:
         trim_actions: list[str] = []
         turns = list(recent_turns)
         memories = list(memory_snippets)
+        orig_turn_count = len(turns)
+        orig_memory_count = len(memories)
+        turns, turn_signatures = self._dedupe_recent_turns(turns)
+        memories = self._dedupe_memories(memories, turn_signatures)
+        dedupe_actions: list[str] = []
+        if len(turns) < orig_turn_count:
+            dedupe_actions.append("dedupe_recent_turns")
+        if len(memories) < orig_memory_count:
+            dedupe_actions.append("dedupe_memories")
+        trim_actions.extend(dedupe_actions)
         invocation_docs: list[dict] = []
         routing_docs: list[dict] = []
         full_docs: list[dict] = []
@@ -66,6 +153,7 @@ class ContextCompiler:
                 query=tool_query or user_message,
                 mode=tool_context_mode,
                 selected_tool_names=selected_tool_names,
+                allowed_tool_names=allowed_tool_names,
                 k=4,
             )
             routing_docs = docs.routing

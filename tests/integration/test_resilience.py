@@ -60,7 +60,7 @@ class AlwaysFailProvider(ProviderAdapter):
 
 
 @pytest.fixture
-def phase3_runtime(tmp_path):
+def runtime_fixture(tmp_path):
     session_factory, engine = create_session_factory(f"sqlite:///{tmp_path / 'p3.db'}")
     import littlehive.db.models  # noqa: F401
 
@@ -97,7 +97,7 @@ def phase3_runtime(tmp_path):
             )
             db.commit()
 
-    ex = ToolExecutor(registry=registry, logger=get_logger("test.phase3"), call_logger=persist_tool_call)
+    ex = ToolExecutor(registry=registry, logger=get_logger("test.resilience"), call_logger=persist_tool_call)
     pipeline = TaskPipeline(cfg=cfg, db_session_factory=session_factory, tool_executor=ex, provider_router=router)
     runtime = TelegramRuntime(
         auth=TelegramAllowlistAuth(cfg.channels.telegram),
@@ -105,14 +105,14 @@ def phase3_runtime(tmp_path):
         pipeline=pipeline,
         tool_executor=ex,
         db_session_factory=session_factory,
-        logger=get_logger("test.phase3.runtime"),
+        logger=get_logger("test.resilience.runtime"),
     )
     return runtime, session_factory, router
 
 
 @pytest.mark.asyncio
-async def test_provider_timeout_retry_fallback_success(phase3_runtime):
-    runtime, _sf, _router = phase3_runtime
+async def test_provider_timeout_retry_fallback_success(runtime_fixture):
+    runtime, _sf, _router = runtime_fixture
     result = await runtime.pipeline.run_for_telegram(telegram_user_id=1, chat_id=3, user_text="status please")
     assert result.status == "completed"
     assert result.text
@@ -137,8 +137,8 @@ async def test_repeated_provider_failures_open_breaker_then_recover(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_trace_summary_persistence_contains_resilience_events(phase3_runtime):
-    runtime, session_factory, _router = phase3_runtime
+async def test_trace_summary_persistence_contains_resilience_events(runtime_fixture):
+    runtime, session_factory, _router = runtime_fixture
     await runtime.pipeline.run_for_telegram(telegram_user_id=1, chat_id=5, user_text="remember this and status")
 
     with session_factory() as db:
@@ -148,7 +148,7 @@ async def test_trace_summary_persistence_contains_resilience_events(phase3_runti
 
 
 @pytest.mark.asyncio
-async def test_telegram_runtime_smoke_phase3(phase3_runtime):
-    runtime, _sf, _router = phase3_runtime
+async def test_telegram_runtime_smoke(runtime_fixture):
+    runtime, _sf, _router = runtime_fixture
     out = await runtime.handle_user_text(1, 77, "/help")
     assert "Commands" in out

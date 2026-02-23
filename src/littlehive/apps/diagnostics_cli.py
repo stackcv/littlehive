@@ -6,7 +6,7 @@ from littlehive.core.config.hardware_audit import collect_hardware_audit, render
 from littlehive.core.config.loader import load_app_config
 from littlehive.core.config.recommender import recommend_models
 from littlehive.core.providers.health import check_configured_providers
-from littlehive.core.telemetry.diagnostics import budget_stats, failure_summary, runtime_stats
+from littlehive.core.telemetry.diagnostics import budget_stats, failure_summary, runtime_stats, tool_retrieval_quality_stats
 
 
 def main() -> int:
@@ -22,6 +22,7 @@ def main() -> int:
     parser.add_argument("--failures", action="store_true")
     parser.add_argument("--runtime-stats", action="store_true")
     parser.add_argument("--budget-stats", action="store_true")
+    parser.add_argument("--tool-quality", action="store_true")
     parser.add_argument("--supervisor-status", action="store_true")
     args = parser.parse_args()
 
@@ -37,6 +38,7 @@ def main() -> int:
             args.failures,
             args.runtime_stats,
             args.budget_stats,
+            args.tool_quality,
         ]
     )
 
@@ -90,7 +92,7 @@ def main() -> int:
             print(f"- notes={rec.notes}")
 
     runtime = None
-    if args.provider_health or args.failures or args.runtime_stats or args.budget_stats:
+    if args.provider_health or args.failures or args.runtime_stats or args.budget_stats or args.tool_quality:
         did_work = True
         runtime = build_telegram_runtime(config_path=args.config)
 
@@ -132,6 +134,18 @@ def main() -> int:
         print(f"- over_budget_incidents={b['over_budget_incidents']}")
         print(f"- trace_count={b['trace_count']}")
 
+    if args.tool_quality and runtime is not None:
+        print("tool-quality:")
+        q = tool_retrieval_quality_stats(runtime.db_session_factory)
+        print(f"- total_tool_calls={q['total_tool_calls']}")
+        print(f"- ok_calls={q['ok_calls']}")
+        print(f"- blocked_calls={q['blocked_calls']}")
+        print(f"- error_calls={q['error_calls']}")
+        print(f"- waiting_confirmation_calls={q['waiting_confirmation_calls']}")
+        print(f"- success_rate={q['success_rate']}")
+        print(f"- blocked_rate={q['blocked_rate']}")
+        print(f"- error_rate={q['error_rate']}")
+
     if args.supervisor_status:
         did_work = True
         print("supervisor-status: available (use littlehive-supervisor --once)")
@@ -139,7 +153,7 @@ def main() -> int:
     if not did_work:
         print(
             "diag-ready (use --validate-config/--hardware/--check-providers/--recommend-models "
-            "--provider-health/--failures/--runtime-stats/--budget-stats)"
+            "--provider-health/--failures/--runtime-stats/--budget-stats/--tool-quality)"
         )
     return 0
 

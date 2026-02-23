@@ -28,7 +28,7 @@ def _write_config(path, db_url: str) -> None:
 @pytest.fixture
 def api_client(tmp_path, monkeypatch):
     cfg_path = tmp_path / "instance.yaml"
-    db_url = f"sqlite:///{tmp_path / 'phase45_api.db'}"
+    db_url = f"sqlite:///{tmp_path / 'admin_api.db'}"
     _write_config(cfg_path, db_url)
     os.environ["LITTLEHIVE_ADMIN_TOKEN"] = "test-token"
 
@@ -106,6 +106,7 @@ def test_admin_read_only_endpoints(api_client):
     assert client.get("/agents").status_code == 200
     assert client.get("/tasks").status_code == 200
     assert client.get("/diagnostics/failures").status_code == 200
+    assert client.get("/diagnostics/tool-quality").status_code == 200
 
 
 def test_patch_permission_profile_updates_and_audits(api_client):
@@ -143,6 +144,38 @@ def test_trace_endpoint_returns_compact_summary(api_client):
     body = trace.json()
     assert body["retry_count"] >= 0
     assert "agent_sequence" in body
+
+
+def test_trace_endpoint_returns_latest_row_when_multiple_exist(api_client):
+    client, sf = api_client
+    tasks = client.get("/tasks").json()["items"]
+    task_id = tasks[0]["task_id"]
+
+    with sf() as db:
+        task = db.query(Task).filter(Task.id == task_id).one()
+        db.add(
+            TaskTraceSummary(
+                task_id=task_id,
+                session_id=task.session_id,
+                request_id="r2",
+                agent_sequence="planner>reply",
+                transfer_count=0,
+                provider_attempts=1,
+                tool_attempts=0,
+                retry_count=0,
+                breaker_events=0,
+                trim_event_count=0,
+                avg_estimated_tokens=90.0,
+                outcome_status="completed",
+                created_at=datetime.now(timezone.utc),
+            )
+        )
+        db.commit()
+
+    trace = client.get(f"/tasks/{task_id}/trace")
+    assert trace.status_code == 200
+    body = trace.json()
+    assert body["request_id"] == "r2"
 
 
 def test_memory_search_redacts_secret_like_data(api_client):

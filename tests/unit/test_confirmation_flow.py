@@ -9,7 +9,7 @@ from littlehive.db.session import Base, create_session_factory
 
 
 def test_confirmation_state_transitions(tmp_path):
-    sf, engine = create_session_factory(f"sqlite:///{tmp_path / 'phase45_confirm.db'}")
+    sf, engine = create_session_factory(f"sqlite:///{tmp_path / 'confirmations.db'}")
     import littlehive.db.models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
@@ -30,7 +30,7 @@ def test_confirmation_state_transitions(tmp_path):
 
 
 def test_confirmation_expires(tmp_path):
-    sf, engine = create_session_factory(f"sqlite:///{tmp_path / 'phase45_confirm_exp.db'}")
+    sf, engine = create_session_factory(f"sqlite:///{tmp_path / 'confirmations_exp.db'}")
     import littlehive.db.models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)

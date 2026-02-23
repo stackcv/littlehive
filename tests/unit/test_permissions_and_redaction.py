@@ -34,7 +34,7 @@ def test_redaction_hides_secret_like_values():
 
 
 def test_usage_summary_handles_partial_telemetry(tmp_path):
-    sf, engine = create_session_factory(f"sqlite:///{tmp_path / 'phase45_usage.db'}")
+    sf, engine = create_session_factory(f"sqlite:///{tmp_path / 'usage_metrics.db'}")
     import littlehive.db.models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
@@ -65,7 +65,7 @@ def test_usage_summary_handles_partial_telemetry(tmp_path):
     assert out["trace_count"] == 1
 
 
-def test_config_has_phase45_defaults():
+def test_config_has_admin_defaults():
     cfg = AppConfig()
     assert cfg.dashboard_host == "127.0.0.1"
     assert cfg.dashboard_port == 8666
@@ -73,7 +73,7 @@ def test_config_has_phase45_defaults():
 
 
 def test_admin_service_profile_persistence(tmp_path):
-    sf, engine = create_session_factory(f"sqlite:///{tmp_path / 'phase45_profile.db'}")
+    sf, engine = create_session_factory(f"sqlite:///{tmp_path / 'permission_profile.db'}")
     import littlehive.db.models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)

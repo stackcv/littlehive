@@ -34,6 +34,22 @@ class ToolExecutor:
         self.safe_mode_getter = safe_mode_getter or (lambda: True)
         self.create_confirmation = create_confirmation
 
+    def list_allowed_tool_names(self) -> set[str]:
+        allowed: set[str] = set()
+        safe_mode = self.safe_mode_getter()
+        for meta in self.registry.list_tools():
+            try:
+                risk = RiskLevel(meta.risk_level)
+            except ValueError:
+                risk = RiskLevel.MEDIUM
+            decision = self.policy_engine.evaluate_tool_risk(
+                risk_level=risk.value,
+                safe_mode=safe_mode,
+            )
+            if decision.allowed:
+                allowed.add(meta.name)
+        return allowed
+
     def execute(self, tool_name: str, ctx: ToolCallContext, args: dict) -> dict:
         handler = self.registry.get_handler(tool_name)
         meta = self.registry.get_metadata(tool_name)

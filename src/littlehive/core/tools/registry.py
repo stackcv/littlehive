@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import time
 from dataclasses import dataclass
 
 from littlehive.core.tools.base import ToolHandler, ToolMetadata
@@ -20,6 +21,9 @@ class ToolRegistry:
     def __init__(self) -> None:
         self._tools: dict[str, tuple[ToolMetadata, ToolHandler]] = {}
         self._conn = sqlite3.connect(":memory:")
+        self._cache_ttl_seconds = 20.0
+        self._cache_max_entries = 256
+        self._query_cache: dict[tuple[str, int], tuple[float, list[ToolShortlistItem]]] = {}
         self._conn.execute(
             "CREATE VIRTUAL TABLE IF NOT EXISTS tool_docs_fts "
             "USING fts5(name, tags, routing_summary, invocation_summary)"
@@ -29,6 +33,7 @@ class ToolRegistry:
 
     def register(self, metadata: ToolMetadata, handler: ToolHandler) -> None:
         self._tools[metadata.name] = (metadata, handler)
+        self._query_cache.clear()
         tags_str = " ".join(metadata.tags)
         self._conn.execute("DELETE FROM tool_docs_fts WHERE name = ?", (metadata.name,))
         self._conn.execute("INSERT INTO tool_docs_fts(name, tags, routing_summary, invocation_summary) VALUES (?, ?, ?, ?)",
@@ -64,6 +69,11 @@ class ToolRegistry:
                 )
                 for m in metas[:k]
             ]
+        cache_key = (q.lower(), int(k))
+        cached = self._query_cache.get(cache_key)
+        now = time.time()
+        if cached and (now - cached[0]) <= self._cache_ttl_seconds:
+            return list(cached[1])
 
         try:
             cursor = self._conn.execute(
@@ -100,4 +110,8 @@ class ToolRegistry:
                     score=float(-rank),
                 )
             )
+        if len(self._query_cache) >= self._cache_max_entries:
+            oldest_key = min(self._query_cache.items(), key=lambda item: item[1][0])[0]
+            self._query_cache.pop(oldest_key, None)
+        self._query_cache[cache_key] = (now, list(out))
         return out

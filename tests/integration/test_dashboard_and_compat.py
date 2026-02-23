@@ -61,7 +61,7 @@ class _Update:
 
 
 def _runtime(tmp_path):
-    db_file = tmp_path / "phase45_compat.db"
+    db_file = tmp_path / "dashboard_compat.db"
     session_factory, engine = create_session_factory(f"sqlite:///{db_file}")
     import littlehive.db.models  # noqa: F401
 
@@ -97,7 +97,7 @@ def _runtime(tmp_path):
             )
             db.commit()
 
-    executor = ToolExecutor(registry=registry, logger=get_logger("test.phase45"), call_logger=persist_tool_call)
+    executor = ToolExecutor(registry=registry, logger=get_logger("test.dashboard"), call_logger=persist_tool_call)
     pipeline = TaskPipeline(cfg=cfg, db_session_factory=session_factory, tool_executor=executor, provider_router=provider_router)
     return TelegramRuntime(
         auth=TelegramAllowlistAuth(cfg.channels.telegram),
@@ -105,7 +105,7 @@ def _runtime(tmp_path):
         pipeline=pipeline,
         tool_executor=executor,
         db_session_factory=session_factory,
-        logger=get_logger("test.phase45.runtime"),
+        logger=get_logger("test.dashboard.runtime"),
     )
 
 

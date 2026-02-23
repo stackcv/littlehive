@@ -25,6 +25,8 @@ context:
 telemetry:
   log_level: INFO
   json_logs: true
+  log_compiled_prompts: false
+  prompt_log_max_chars: 4000
 database:
   url: sqlite:///littlehive.db
 providers:
@@ -50,6 +52,12 @@ channels:
     owner_user_id: null
     allow_user_ids: []
     polling_timeout_seconds: 30
+tools:
+  weather:
+    enabled: false
+    provider: weatherapi
+    api_key_env: LITTLEHIVE_WEATHER_API_KEY
+    timeout_seconds: 10
 dashboard_host: 127.0.0.1
 dashboard_port: 8666
 admin_token_env: LITTLEHIVE_ADMIN_TOKEN

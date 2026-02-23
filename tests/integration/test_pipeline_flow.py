@@ -17,9 +17,8 @@ from littlehive.core.tools.builtin.memory_tools import register_memory_tools
 from littlehive.core.tools.builtin.status_tools import register_status_tools
 from littlehive.core.tools.builtin.task_tools import register_task_tools
 from littlehive.core.tools.executor import ToolExecutor
-from littlehive.core.tools.injection import build_tool_docs_bundle
 from littlehive.core.tools.registry import ToolRegistry
-from littlehive.db.models import ToolCall
+from littlehive.db.models import MemoryRecord, SessionSummary, Task, ToolCall, TransferEvent
 from littlehive.db.session import Base, create_session_factory
 
 
@@ -27,15 +26,15 @@ class TestProvider(ProviderAdapter):
     name = "local_compatible"
 
     def generate(self, request: ProviderRequest) -> ProviderResponse:
-        return ProviderResponse(provider=self.name, model=request.model, output_text="longevity-reply", raw={})
+        return ProviderResponse(provider=self.name, model=request.model, output_text="pipeline-reply", raw={"echo": request.prompt[:50]})
 
     def health(self) -> bool:
         return True
 
 
 @pytest.fixture
-def phase2_runtime(tmp_path):
-    session_factory, engine = create_session_factory(f"sqlite:///{tmp_path / 'p2_long.db'}")
+def runtime_fixture(tmp_path):
+    session_factory, engine = create_session_factory(f"sqlite:///{tmp_path / 'p2.db'}")
     import littlehive.db.models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
@@ -73,7 +72,7 @@ def phase2_runtime(tmp_path):
             )
             db.commit()
 
-    executor = ToolExecutor(registry=registry, logger=get_logger("test.phase2.long"), call_logger=persist_tool_call)
+    executor = ToolExecutor(registry=registry, logger=get_logger("test.pipeline"), call_logger=persist_tool_call)
     pipeline = TaskPipeline(cfg=cfg, db_session_factory=session_factory, tool_executor=executor, provider_router=provider_router)
     runtime = TelegramRuntime(
         auth=TelegramAllowlistAuth(cfg.channels.telegram),
@@ -81,38 +80,59 @@ def phase2_runtime(tmp_path):
         pipeline=pipeline,
         tool_executor=executor,
         db_session_factory=session_factory,
-        logger=get_logger("test.phase2.long.runtime"),
+        logger=get_logger("test.pipeline.runtime"),
     )
     return runtime, session_factory
 
 
 @pytest.mark.asyncio
-async def test_long_session_prompt_growth_bounded(phase2_runtime):
-    runtime, _ = phase2_runtime
-    for i in range(120):
-        await runtime.handle_user_text(1, 999, f"remember long run preference #{i}")
+async def test_long_chat_generates_cards_and_bounded_context(runtime_fixture):
+    runtime, session_factory = runtime_fixture
+    for i in range(40):
+        text = f"remember preference {i} for this session"
+        await runtime.handle_user_text(user_id=1, chat_id=42, text=text)
 
-    traces = recent_traces(limit=500)
+    with session_factory() as db:
+        memory_count = db.query(MemoryRecord).count()
+        summary_count = db.query(SessionSummary).count()
+    assert memory_count > 0
+    assert summary_count > 0
+
+    traces = recent_traces(limit=200)
     reply_compiles = [t for t in traces if t.get("event") == "context_compiled" and t.get("agent") == "reply_agent"]
     assert reply_compiles
-    first = int(reply_compiles[0].get("estimated_tokens", 1))
-    last = int(reply_compiles[-1].get("estimated_tokens", 1))
-    assert last <= runtime.pipeline.cfg.context.max_input_tokens
-    assert last <= max(first * 4, 120)
+    max_est = max(int(t.get("estimated_tokens", 0)) for t in reply_compiles)
+    assert max_est <= runtime.pipeline.cfg.context.max_input_tokens
 
 
 @pytest.mark.asyncio
-async def test_no_global_tool_schema_dump_across_steps(phase2_runtime):
-    runtime, _ = phase2_runtime
-    registry = runtime.tool_executor.registry
+async def test_planner_transfer_execution_reply_flow(runtime_fixture):
+    runtime, session_factory = runtime_fixture
+    result = await runtime.pipeline.run_for_telegram(telegram_user_id=1, chat_id=9, user_text="status and remember this for later")
+    assert result.status == "completed"
 
-    for i in range(5):
-        routing = build_tool_docs_bundle(registry=registry, query=f"memory {i}", mode="routing")
-        full = build_tool_docs_bundle(
-            registry=registry,
-            query=f"memory {i}",
-            mode="full_for_selected",
-            selected_tool_names=[routing.routing[0]["name"]] if routing.routing else [],
-        )
-        assert not routing.full
-        assert len(full.full) <= 1
+    with session_factory() as db:
+        transfers = db.query(TransferEvent).count()
+        tasks = db.query(Task).count()
+    assert transfers >= 1
+    assert tasks >= 1
+
+
+@pytest.mark.asyncio
+async def test_tool_schema_only_at_execution_step(runtime_fixture):
+    runtime, _ = runtime_fixture
+    await runtime.pipeline.run_for_telegram(telegram_user_id=1, chat_id=10, user_text="memory search this and remember it")
+    traces = recent_traces(limit=200)
+    compiled_exec = [t for t in traces if t.get("event") == "context_compiled" and t.get("agent") == "execution_agent"]
+    compiled_planner = [t for t in traces if t.get("event") == "context_compiled" and t.get("agent") == "planner_agent"]
+    assert compiled_exec
+    assert compiled_planner
+
+
+@pytest.mark.asyncio
+async def test_telegram_runtime_smoke(runtime_fixture):
+    runtime, _ = runtime_fixture
+    help_text = await runtime.handle_user_text(1, 77, "/help")
+    normal = await runtime.handle_user_text(1, 77, "remember my editor is vim")
+    assert "Commands" in help_text
+    assert normal

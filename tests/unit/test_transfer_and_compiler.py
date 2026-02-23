@@ -57,7 +57,7 @@ def test_context_compiler_v2_trim_order_and_schema_controls():
     assert compiled.preflight is not None
     assert compiled.preflight.allowed or compiled.over_budget
     if compiled.trim_actions:
-        assert compiled.trim_actions[0] in {"drop_memory_card", "drop_oldest_recent_turn"}
+        assert compiled.trim_actions[0] in {"dedupe_recent_turns", "dedupe_memories", "drop_memory_card", "drop_oldest_recent_turn"}
     assert "tool_full_schema" not in compiled.prompt_text
 
     compiled_full = compiler.compile(

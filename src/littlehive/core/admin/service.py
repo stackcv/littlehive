@@ -8,7 +8,7 @@ from sqlalchemy import and_, func, select
 
 from littlehive import __version__
 from littlehive.core.permissions.policy_engine import PermissionProfile, PolicyEngine
-from littlehive.core.telemetry.diagnostics import budget_stats, failure_summary, runtime_stats
+from littlehive.core.telemetry.diagnostics import budget_stats, failure_summary, runtime_stats, tool_retrieval_quality_stats
 from littlehive.db.models import (
     MemoryRecord,
     PendingConfirmation,
@@ -435,7 +435,16 @@ class AdminService:
 
     def get_trace(self, task_id: int) -> dict | None:
         with self.db_session_factory() as db:
-            row = db.execute(select(TaskTraceSummary).where(TaskTraceSummary.task_id == task_id)).scalar_one_or_none()
+            row = (
+                db.execute(
+                    select(TaskTraceSummary)
+                    .where(TaskTraceSummary.task_id == task_id)
+                    .order_by(TaskTraceSummary.created_at.desc(), TaskTraceSummary.id.desc())
+                    .limit(1)
+                )
+                .scalars()
+                .first()
+            )
         if row is None:
             return None
         return {
@@ -496,6 +505,9 @@ class AdminService:
         data = runtime_stats(self.db_session_factory)
         data["safe_mode"] = self.get_safe_mode()
         return data
+
+    def tool_retrieval_quality_summary(self) -> dict:
+        return tool_retrieval_quality_stats(self.db_session_factory)
 
     def list_users(self, limit: int = 100) -> list[dict]:
         with self.db_session_factory() as db:

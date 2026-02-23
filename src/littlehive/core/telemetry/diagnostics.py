@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy import func, select
 
-from littlehive.db.models import FailureFingerprint, Task, TaskTraceSummary
+from littlehive.db.models import FailureFingerprint, Task, TaskTraceSummary, ToolCall
 
 
 def runtime_stats(db_session_factory) -> dict:
@@ -60,4 +60,26 @@ def budget_stats(db_session_factory) -> dict:
         "trim_event_count": int(trims),
         "over_budget_incidents": int(over_budget),
         "trace_count": len(rows),
+    }
+
+
+def tool_retrieval_quality_stats(db_session_factory) -> dict:
+    with db_session_factory() as db:
+        rows = db.execute(select(ToolCall.status, func.count(ToolCall.id)).group_by(ToolCall.status)).all()
+    counts = {str(k): int(v) for k, v in rows}
+    ok = counts.get("ok", 0)
+    blocked = counts.get("blocked", 0)
+    error = counts.get("error", 0)
+    waiting = counts.get("waiting_confirmation", 0)
+    total = sum(counts.values())
+    actionable = max(1, ok + blocked + error)
+    return {
+        "total_tool_calls": total,
+        "ok_calls": ok,
+        "blocked_calls": blocked,
+        "error_calls": error,
+        "waiting_confirmation_calls": waiting,
+        "success_rate": round(ok / max(1, total), 4),
+        "blocked_rate": round(blocked / actionable, 4),
+        "error_rate": round(error / actionable, 4),
     }
