@@ -1,127 +1,76 @@
-# LittleHive
+# LittleHive 🐝
 
-LittleHive is a local-first, multi-model, multi-agent assistant platform.
+**A private, local-first AI assistant built exclusively for Apple Silicon.**
 
-## Built-in Tools
-- `status.get`
-- `utility.echo`
-- `task.create`
-- `task.update`
-- `memory.search`
-- `memory.write`
-- `memory.summarize`
-- `memory.failure_fix`
+LittleHive is your personal AI agent that runs entirely on your Mac. Powered by Mistral's highly capable **Ministral 3B** model running natively via Apple's **MLX** framework, LittleHive ensures that your data, emails, and schedule are processed locally and completely privately.
 
-## Install
+No cloud processing for the AI. No subscription fees. Just a fast, intelligent assistant living on your machine.
+
+---
+
+## ✨ Major Features
+
+*   **100% Local AI:** Uses Apple's MLX to run the Ministral 3B model directly on your hardware, ensuring lightning-fast responses and absolute privacy.
+*   **Google Workspace Integration:** Securely connects to your Gmail and Google Calendar to read, draft, send emails, and manage your daily schedule.
+*   **Proactive Assistant:** Runs quietly in the background. It polls for new events, handles scheduled reminders, and manages tasks without you having to constantly prompt it.
+*   **Long-Term Memory:** Automatically extracts and remembers context from your past conversations, becoming more personalized over time.
+*   **Web Dashboard:** Includes a clean, built-in local web interface to chat with your assistant, monitor background tasks, and easily manage your settings.
+
+---
+
+## 💻 Requirements
+
+*   **Hardware:** An Apple Silicon Mac (M1, M2, M3, or M4 series). *Intel Macs are not supported.*
+*   **Software:** macOS with Python 3.11 or higher installed.
+
+---
+
+## 🚀 Installation
+
+It is highly recommended to install LittleHive inside an isolated Python "virtual environment" to keep your system clean.
+
+**1. Create and activate a virtual environment:**
+Open your terminal and run:
+```bash
+python3 -m venv littlehive-env
+source littlehive-env/bin/activate
+```
+
+**2. Install LittleHive:**
 ```bash
 pip install littlehive
 ```
 
-## Quickstart
-1. Start LittleHive:
-```bash
-lhive run
-# or: lh-run
-```
-This will:
-- run **quick onboarding** on first launch (if config is missing),
-- load `.env`,
-- start API, dashboard, and Telegram worker (when enabled and token is present),
-- keep supervisor off by default to reduce console noise,
-- print the local dashboard URL.
+---
 
-For full power-user onboarding prompts:
-```bash
-lhive run --advanced
-# or: littlehive-run --advanced
-```
+## 🕹️ Usage
 
-To reset local setup and start fresh:
+Once installed, managing your assistant is incredibly simple using the `lhive` command.
+
+**Start the Assistant:**
 ```bash
-lhive reset
-# or: lh-reset
+lhive start
+```
+*Note: The first time you start LittleHive, it will download the Ministral AI model. This might take a few minutes depending on your internet connection.*
+
+**Access the Dashboard:**
+Once the assistant is awake, open your web browser and navigate to:
+👉 **[http://localhost:8080](http://localhost:8080)**
+
+**Stop the Assistant:**
+```bash
+lhive stop
 ```
 
-2. Optional diagnostics:
-```bash
-littlehive-diag --validate-config --hardware --check-providers
-```
+*(You can also use `lhive restart` to quickly reboot the agent).*
 
-Advanced/manual control CLIs are still available (see below).
+---
 
-## Dashboard
-`littlehive-dashboard` is Python-only (NiceGUI), no Node/React install required.
+## 📂 Where is my data?
 
-Main views:
-- Overview
-- Providers (health + breaker + routing score)
-- Tasks
-- Users (optional profile context: name/timezone/city/country/notes)
-- Memory search
-- Permissions and power controls
-- Usage/Budgets
-- Diagnostics/Failures
-- Pending confirmations
+LittleHive believes your data belongs to you. Everything is stored locally in your home directory:
 
-## Optional User Context
-You can optionally store per-user context from the Dashboard `Users` tab (or admin API):
-- display name
-- preferred timezone
-- city
-- country
-- notes
-
-This context is injected into runtime metadata and can be used for personalized responses.
-
-## Safety and Permission Profiles
-Supported permission profiles:
-- `read_only`: blocks all tool execution.
-- `assist_only`: allows only low-risk tool actions.
-- `execute_safe`: allows low-risk, requires confirmation for medium-risk, blocks high/critical.
-- `execute_with_confirmation`: allows medium/high with confirmation, blocks critical in safe mode.
-- `full_trusted`: allows all except critical when safe mode is enabled.
-
-Risk levels (`low|medium|high|critical`) are enforced in tool execution. Medium/high actions can require confirmations depending on profile and safe mode.
-Default profile is `execute_safe`.
-Profile can be changed from the Dashboard Permissions tab or via Admin API (`PATCH /permissions/profile`).
-
-## Diagnostics
-```bash
-littlehive-diag --provider-health
-littlehive-diag --failures
-littlehive-diag --runtime-stats
-littlehive-diag --budget-stats
-```
-
-## CLI Entrypoints
-- `lhive` (short command: `lhive run`, `lhive reset`, `lhive diag`)
-- `lh-run` (short alias)
-- `lh-reset` (short alias)
-- `littlehive-run` (recommended for end users)
-- `littlehive-onboard`
-- `littlehive-api`
-- `littlehive-telegram`
-- `littlehive-diag`
-- `littlehive-dashboard`
-- `littlehive-supervisor`
-- `littlehive-reset`
-
-## Development
-Install editable package with dev tooling:
-```bash
-pip install -e ".[dev]"
-```
-
-Run checks:
-```bash
-pytest -q
-python -m build
-twine check dist/*
-```
-
-## Limitations
-- Dashboard auth is currently basic token gating; default host binding is localhost.
-- Provider/tool telemetry is compact summaries by design (no full raw payload dump).
-
-## Roadmap
-Phase 6+: richer admin auth, stronger benchmarking, and broader channel/runtime controls.
+*   **Main Directory:** `~/.littlehive/`
+*   **Logs:** `~/.littlehive/logs/agent.log` (Check here if you ever need to troubleshoot)
+*   **Local Database:** `~/.littlehive/db/littlehive.db` (Contains your chat history, memory, and reminders)
+*   **Configuration & Auth:** `~/.littlehive/config/`
