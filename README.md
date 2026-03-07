@@ -66,6 +66,39 @@ lhive stop
 
 ---
 
+## 💬 What can you ask LittleHive?
+
+Because LittleHive is deeply integrated with your local environment and Google Workspace, you can ask it to perform complex, multi-step tasks natively:
+
+*   **Email Management:**
+    *   *"Do I have any unread emails from my manager?"*
+    *   *"Draft a polite reply to Sarah saying I'll have the report ready by Friday, and send it."*
+    *   *"Archive all the newsletter emails I received today."*
+*   **Calendar & Scheduling:**
+    *   *"What does my schedule look like tomorrow morning?"*
+    *   *"Block out 2 hours for deep work this afternoon."*
+    *   *"Schedule a 30-minute sync with Alex for next Tuesday at 10 AM."*
+*   **Reminders & Tasks:**
+    *   *"Remind me to check the oven in 45 minutes."*
+    *   *"Set a reminder to follow up on the marketing budget next Monday at 9 AM."*
+*   **Memory & Context:**
+    *   *"What was the name of the restaurant John recommended to me last week?"*
+    *   *"Summarize the key points from our conversation yesterday regarding the new project."*
+
+---
+
+## ⚙️ Customizing LittleHive
+
+You can easily tweak LittleHive's behavior via the Web Dashboard or by editing the configuration files in `~/.littlehive/config/`. 
+
+**Simple settings you can change:**
+*   **AI Model:** Switch to a different MLX-compatible model (e.g., swapping between 8B and 14B versions depending on your Mac's RAM).
+*   **System Prompt:** Edit the `system_prompt.md` file to give your assistant a custom name, change its personality, or set strict rules on how it should reply.
+*   **User Details:** Add your name, timezone, and personal preferences so the AI has better context when helping you.
+*   **Polling Intervals:** Adjust how often the background agent checks for new emails or upcoming calendar events.
+
+---
+
 ## 📂 Where is my data?
 
 LittleHive believes your data belongs to you. Everything is stored locally in your home directory:
