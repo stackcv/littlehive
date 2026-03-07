@@ -17,7 +17,9 @@ dependencies = [
   "sentence-transformers",
   "scikit-learn",
   "mlx-lm",
-  "apscheduler"
+  "apscheduler",
+  "semantic-router",
+  "requests"
 ]
 
 [project.optional-dependencies]
