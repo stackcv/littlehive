@@ -816,6 +816,8 @@ def main():
             logger.info("\nShutting down master brain...")
             sys.exit(0)
 
+        logger.info(f"📬 Received message from {task.get(\"source\")}: {task.get(\"text\")[:50]}...")
+
         source = task["source"]
         user_input = task["text"]
 
@@ -934,9 +936,11 @@ def main():
 
         has_fired_callback = False
         message_start_time = time.time()
+        logger.info(f"🧠 [Brain] Beginning thought process for: {user_input[:30]}...")
 
         try:
             while True:  # Tool Chaining Loop
+                logger.info("  -> Routing to determine active tools...")
                 current_route_tools = get_active_tools(user_input)
 
                 all_required_tools = list(historically_active_tools)
@@ -949,6 +953,7 @@ def main():
                 if all_required_tools:
                     chat_kwargs["tools"] = all_required_tools
 
+                logger.info("  -> Applying chat template...")
                 full_prompt_text = tokenizer.apply_chat_template(
                     messages, **chat_kwargs
                 )
@@ -963,6 +968,8 @@ def main():
                 temp = get_config().get("temperature", 0.35)
                 sampler = make_sampler(temp=temp)
 
+                logger.info(f"  -> Starting stream_generate with {len(prompt_tokens)} new tokens...")
+                first_token_received = False
                 for response in stream_generate(
                     model,
                     tokenizer,
@@ -971,6 +978,10 @@ def main():
                     max_tokens=2048,
                     sampler=sampler,
                 ):
+                    if not first_token_received:
+                        logger.info("  -> Stream generation has begun yielding tokens!")
+                        first_token_received = True
+
                     full_response += response.text
                     if "[TOOL_CALLS]" in full_response:
                         is_tool_call = True
@@ -978,6 +989,8 @@ def main():
                     if not is_tool_call:
                         if full_response.startswith("[") and len(full_response) < 15:
                             pass
+
+                logger.info(f"  -> Generation complete. length={len(full_response)}, is_tool_call={is_tool_call}")
 
                 # --- CACHE ROLLBACK ---
                 # MLX generation appends sampled tokens to the cache.
