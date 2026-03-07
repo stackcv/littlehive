@@ -2,15 +2,34 @@ import json
 from typing import Dict, Any, List
 
 # --- Import tool modules here ---
-from littlehive.tools.calendar_tools import CALENDAR_TOOLS_SCHEMA, execute_tool as calendar_execute
-from littlehive.tools.email_tools import EMAIL_TOOLS_SCHEMA, execute_tool as email_execute
-from littlehive.tools.finance_tools import FINANCE_TOOLS_SCHEMA, execute_tool as finance_execute
-from littlehive.tools.reminder_tools import REMINDER_TOOLS_SCHEMA, execute_tool as reminder_execute
-from littlehive.tools.stakeholder_tools import STAKEHOLDER_TOOLS_SCHEMA, execute_tool as stakeholder_execute
+from littlehive.tools.calendar_tools import (
+    CALENDAR_TOOLS_SCHEMA,
+    execute_tool as calendar_execute,
+)
+from littlehive.tools.email_tools import (
+    EMAIL_TOOLS_SCHEMA,
+    execute_tool as email_execute,
+)
+from littlehive.tools.finance_tools import (
+    FINANCE_TOOLS_SCHEMA,
+    execute_tool as finance_execute,
+)
+from littlehive.tools.reminder_tools import (
+    REMINDER_TOOLS_SCHEMA,
+    execute_tool as reminder_execute,
+)
+from littlehive.tools.stakeholder_tools import (
+    STAKEHOLDER_TOOLS_SCHEMA,
+    execute_tool as stakeholder_execute,
+)
 from littlehive.tools.task_queue import QUEUE_TOOLS_SCHEMA, execute_queue_tool
 
 
-from littlehive.tools.memory_tools import save_core_fact, search_past_conversations, delete_core_fact
+from littlehive.tools.memory_tools import (
+    save_core_fact,
+    search_past_conversations,
+    delete_core_fact,
+)
 
 MEMORY_TOOLS_SCHEMA = [
     {
@@ -23,12 +42,12 @@ MEMORY_TOOLS_SCHEMA = [
                 "properties": {
                     "fact": {
                         "type": "string",
-                        "description": "The fact to remember (e.g., 'User's sister is Jenna', 'User prefers concise answers')."
+                        "description": "The fact to remember (e.g., 'User's sister is Jenna', 'User prefers concise answers').",
                     }
                 },
-                "required": ["fact"]
-            }
-        }
+                "required": ["fact"],
+            },
+        },
     },
     {
         "type": "function",
@@ -40,12 +59,12 @@ MEMORY_TOOLS_SCHEMA = [
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "A keyword or phrase to search for and delete (e.g., 'Jenna' or 'sister')."
+                        "description": "A keyword or phrase to search for and delete (e.g., 'Jenna' or 'sister').",
                     }
                 },
-                "required": ["query"]
-            }
-        }
+                "required": ["query"],
+            },
+        },
     },
     {
         "type": "function",
@@ -57,14 +76,15 @@ MEMORY_TOOLS_SCHEMA = [
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "The search query to look for in past conversations."
+                        "description": "The search query to look for in past conversations.",
                     }
                 },
-                "required": ["query"]
-            }
-        }
-    }
+                "required": ["query"],
+            },
+        },
+    },
 ]
+
 
 def memory_execute(tool_name: str, args: Dict[str, Any]) -> str:
     try:
@@ -79,10 +99,19 @@ def memory_execute(tool_name: str, args: Dict[str, Any]) -> str:
     except Exception as e:
         return json.dumps({"error": str(e)})
 
+
 # --- The Tiered Persona Tool Bundles ---
-# The core Executive Assistant persona requires Email, Calendar, and Finance 
+# The core Executive Assistant persona requires Email, Calendar, and Finance
 # simultaneously to handle cross-domain tasks without hallucinating.
-EA_PERSONA_TOOLS = EMAIL_TOOLS_SCHEMA + CALENDAR_TOOLS_SCHEMA + FINANCE_TOOLS_SCHEMA + REMINDER_TOOLS_SCHEMA + STAKEHOLDER_TOOLS_SCHEMA + MEMORY_TOOLS_SCHEMA + QUEUE_TOOLS_SCHEMA
+EA_PERSONA_TOOLS = (
+    EMAIL_TOOLS_SCHEMA
+    + CALENDAR_TOOLS_SCHEMA
+    + FINANCE_TOOLS_SCHEMA
+    + REMINDER_TOOLS_SCHEMA
+    + STAKEHOLDER_TOOLS_SCHEMA
+    + MEMORY_TOOLS_SCHEMA
+    + QUEUE_TOOLS_SCHEMA
+)
 
 # Map string route names to their respective personas.
 ROUTE_SCHEMAS = {
@@ -95,12 +124,14 @@ ROUTE_SCHEMAS = {
     # "developer": DEV_PERSONA_TOOLS,
 }
 
+
 def get_all_schemas() -> List[Dict[str, Any]]:
     """Returns all available schemas across all routes."""
     all_tools = []
     for schemas in ROUTE_SCHEMAS.values():
         all_tools.extend(schemas)
     return all_tools
+
 
 def dispatch_tool(tool_name: str, tool_args: Dict[str, Any]) -> str:
     """
@@ -112,17 +143,17 @@ def dispatch_tool(tool_name: str, tool_args: Dict[str, Any]) -> str:
     calendar_tool_names = [t["function"]["name"] for t in CALENDAR_TOOLS_SCHEMA]
     if tool_name in calendar_tool_names:
         return calendar_execute(tool_name, tool_args)
-        
+
     # 2. Email tools
     email_tool_names = [t["function"]["name"] for t in EMAIL_TOOLS_SCHEMA]
     if tool_name in email_tool_names:
         return email_execute(tool_name, tool_args)
-        
+
     # 3. Finance tools
     finance_tool_names = [t["function"]["name"] for t in FINANCE_TOOLS_SCHEMA]
     if tool_name in finance_tool_names:
         return finance_execute(tool_name, tool_args)
-        
+
     # 4. Reminder tools
     reminder_tool_names = [t["function"]["name"] for t in REMINDER_TOOLS_SCHEMA]
     if tool_name in reminder_tool_names:
@@ -137,7 +168,6 @@ def dispatch_tool(tool_name: str, tool_args: Dict[str, Any]) -> str:
     memory_tool_names = [t["function"]["name"] for t in MEMORY_TOOLS_SCHEMA]
     if tool_name in memory_tool_names:
         return memory_execute(tool_name, tool_args)
-
 
     # 7. Queue tools
     queue_tool_names = [t["function"]["name"] for t in QUEUE_TOOLS_SCHEMA]

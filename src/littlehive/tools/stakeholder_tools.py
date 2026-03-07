@@ -1,13 +1,13 @@
-import os
 import sqlite3
 import json
 
 from littlehive.agent.paths import DB_PATH
 
+
 def _init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute('''
+    c.execute("""
         CREATE TABLE IF NOT EXISTS stakeholders (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -19,36 +19,62 @@ def _init_db():
             preferences TEXT,
             date_added TEXT
         )
-    ''')
+    """)
     conn.commit()
     conn.close()
 
+
 _init_db()
 
-def add_stakeholder(name: str, alias: str = "", email: str = "", phone: str = "", telegram: str = "", relationship: str = "", preferences: str = "") -> str:
+
+def add_stakeholder(
+    name: str,
+    alias: str = "",
+    email: str = "",
+    phone: str = "",
+    telegram: str = "",
+    relationship: str = "",
+    preferences: str = "",
+) -> str:
     """Add a new stakeholder/contact to the database."""
     try:
         from datetime import datetime
+
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         date_added = datetime.now().isoformat()
-        
-        c.execute('''
+
+        c.execute(
+            """
             INSERT INTO stakeholders (name, alias, email, phone, telegram, relationship, preferences, date_added)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (name, alias, email, phone, telegram, relationship, preferences, date_added))
-        
+        """,
+            (
+                name,
+                alias,
+                email,
+                phone,
+                telegram,
+                relationship,
+                preferences,
+                date_added,
+            ),
+        )
+
         stakeholder_id = c.lastrowid
         conn.commit()
         conn.close()
-        
-        return json.dumps({
-            "status": "success", 
-            "message": f"Stakeholder '{name}' added successfully.", 
-            "stakeholder_id": stakeholder_id
-        })
+
+        return json.dumps(
+            {
+                "status": "success",
+                "message": f"Stakeholder '{name}' added successfully.",
+                "stakeholder_id": stakeholder_id,
+            }
+        )
     except Exception as e:
         return json.dumps({"error": str(e)})
+
 
 def lookup_stakeholder(query: str) -> str:
     """Search for a stakeholder by name, alias, email, phone, telegram, or relationship."""
@@ -56,9 +82,10 @@ def lookup_stakeholder(query: str) -> str:
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
-        
+
         search_term = f"%{query}%"
-        c.execute('''
+        c.execute(
+            """
             SELECT * FROM stakeholders 
             WHERE name LIKE ? 
                OR alias LIKE ? 
@@ -66,17 +93,27 @@ def lookup_stakeholder(query: str) -> str:
                OR phone LIKE ? 
                OR telegram LIKE ?
                OR relationship LIKE ?
-        ''', (search_term, search_term, search_term, search_term, search_term, search_term))
-        
+        """,
+            (
+                search_term,
+                search_term,
+                search_term,
+                search_term,
+                search_term,
+                search_term,
+            ),
+        )
+
         rows = c.fetchall()
         conn.close()
-        
+
         results = [dict(row) for row in rows]
         if not results:
             return json.dumps({"message": f"No stakeholder found matching '{query}'."})
         return json.dumps({"stakeholders": results})
     except Exception as e:
         return json.dumps({"error": str(e)})
+
 
 def remove_stakeholder(stakeholder_id: int) -> str:
     """Remove a stakeholder by their ID."""
@@ -86,28 +123,47 @@ def remove_stakeholder(stakeholder_id: int) -> str:
         c.execute("DELETE FROM stakeholders WHERE id = ?", (stakeholder_id,))
         if c.rowcount == 0:
             conn.close()
-            return json.dumps({"error": f"No stakeholder found with ID {stakeholder_id}"})
+            return json.dumps(
+                {"error": f"No stakeholder found with ID {stakeholder_id}"}
+            )
         conn.commit()
         conn.close()
-        return json.dumps({"status": "success", "message": f"Stakeholder #{stakeholder_id} removed permanently."})
+        return json.dumps(
+            {
+                "status": "success",
+                "message": f"Stakeholder #{stakeholder_id} removed permanently.",
+            }
+        )
     except Exception as e:
         return json.dumps({"error": str(e)})
 
-def update_stakeholder(stakeholder_id: int, name: str = None, alias: str = None, email: str = None, phone: str = None, telegram: str = None, relationship: str = None, preferences: str = None) -> str:
+
+def update_stakeholder(
+    stakeholder_id: int,
+    name: str = None,
+    alias: str = None,
+    email: str = None,
+    phone: str = None,
+    telegram: str = None,
+    relationship: str = None,
+    preferences: str = None,
+) -> str:
     """Update an existing stakeholder's details."""
     try:
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-        
+
         # Check if exists
         c.execute("SELECT * FROM stakeholders WHERE id = ?", (stakeholder_id,))
         if not c.fetchone():
             conn.close()
-            return json.dumps({"error": f"No stakeholder found with ID {stakeholder_id}"})
-            
+            return json.dumps(
+                {"error": f"No stakeholder found with ID {stakeholder_id}"}
+            )
+
         updates = []
         params = []
-        
+
         if name is not None:
             updates.append("name = ?")
             params.append(name)
@@ -129,21 +185,27 @@ def update_stakeholder(stakeholder_id: int, name: str = None, alias: str = None,
         if preferences is not None:
             updates.append("preferences = ?")
             params.append(preferences)
-            
+
         if not updates:
             conn.close()
             return json.dumps({"error": "No fields provided to update."})
-            
+
         query = f"UPDATE stakeholders SET {', '.join(updates)} WHERE id = ?"
         params.append(stakeholder_id)
-        
+
         c.execute(query, tuple(params))
         conn.commit()
         conn.close()
-        
-        return json.dumps({"status": "success", "message": f"Stakeholder #{stakeholder_id} updated successfully."})
+
+        return json.dumps(
+            {
+                "status": "success",
+                "message": f"Stakeholder #{stakeholder_id} updated successfully.",
+            }
+        )
     except Exception as e:
         return json.dumps({"error": str(e)})
+
 
 STAKEHOLDER_TOOLS_SCHEMA = [
     {
@@ -154,17 +216,32 @@ STAKEHOLDER_TOOLS_SCHEMA = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "name": {"type": "string", "description": "Full name of the person."},
-                    "alias": {"type": "string", "description": "Nickname or alternative name (e.g. 'Aish')."},
+                    "name": {
+                        "type": "string",
+                        "description": "Full name of the person.",
+                    },
+                    "alias": {
+                        "type": "string",
+                        "description": "Nickname or alternative name (e.g. 'Aish').",
+                    },
                     "email": {"type": "string", "description": "Email address."},
                     "phone": {"type": "string", "description": "Phone number."},
-                    "telegram": {"type": "string", "description": "Telegram handle or username."},
-                    "relationship": {"type": "string", "description": "Role or relationship to the user (e.g., 'Wife', 'CEO', 'VIP Client')."},
-                    "preferences": {"type": "string", "description": "Specific instructions or context on how to deal with this person (e.g., 'Keep it short', 'Never schedule before 10 AM')."}
+                    "telegram": {
+                        "type": "string",
+                        "description": "Telegram handle or username.",
+                    },
+                    "relationship": {
+                        "type": "string",
+                        "description": "Role or relationship to the user (e.g., 'Wife', 'CEO', 'VIP Client').",
+                    },
+                    "preferences": {
+                        "type": "string",
+                        "description": "Specific instructions or context on how to deal with this person (e.g., 'Keep it short', 'Never schedule before 10 AM').",
+                    },
                 },
-                "required": ["name"]
-            }
-        }
+                "required": ["name"],
+            },
+        },
     },
     {
         "type": "function",
@@ -174,11 +251,14 @@ STAKEHOLDER_TOOLS_SCHEMA = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "query": {"type": "string", "description": "Name, alias, email, or role to search for (e.g., 'Aish', 'Boss', 'david@company.com')."}
+                    "query": {
+                        "type": "string",
+                        "description": "Name, alias, email, or role to search for (e.g., 'Aish', 'Boss', 'david@company.com').",
+                    }
                 },
-                "required": ["query"]
-            }
-        }
+                "required": ["query"],
+            },
+        },
     },
     {
         "type": "function",
@@ -188,11 +268,14 @@ STAKEHOLDER_TOOLS_SCHEMA = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "stakeholder_id": {"type": "integer", "description": "The numeric ID of the stakeholder to remove. Use lookup_stakeholder first to find their ID if you don't know it."}
+                    "stakeholder_id": {
+                        "type": "integer",
+                        "description": "The numeric ID of the stakeholder to remove. Use lookup_stakeholder first to find their ID if you don't know it.",
+                    }
                 },
-                "required": ["stakeholder_id"]
-            }
-        }
+                "required": ["stakeholder_id"],
+            },
+        },
     },
     {
         "type": "function",
@@ -202,26 +285,53 @@ STAKEHOLDER_TOOLS_SCHEMA = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "stakeholder_id": {"type": "integer", "description": "The numeric ID of the stakeholder to update."},
-                    "name": {"type": "string", "description": "Full name of the person (optional)."},
-                    "alias": {"type": "string", "description": "Nickname or alternative name (optional)."},
-                    "email": {"type": "string", "description": "Email address (optional)."},
-                    "phone": {"type": "string", "description": "Phone number (optional)."},
-                    "telegram": {"type": "string", "description": "Telegram handle (optional)."},
-                    "relationship": {"type": "string", "description": "Role or relationship (optional)."},
-                    "preferences": {"type": "string", "description": "Specific instructions or context on how to deal with this person (optional)."}
+                    "stakeholder_id": {
+                        "type": "integer",
+                        "description": "The numeric ID of the stakeholder to update.",
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Full name of the person (optional).",
+                    },
+                    "alias": {
+                        "type": "string",
+                        "description": "Nickname or alternative name (optional).",
+                    },
+                    "email": {
+                        "type": "string",
+                        "description": "Email address (optional).",
+                    },
+                    "phone": {
+                        "type": "string",
+                        "description": "Phone number (optional).",
+                    },
+                    "telegram": {
+                        "type": "string",
+                        "description": "Telegram handle (optional).",
+                    },
+                    "relationship": {
+                        "type": "string",
+                        "description": "Role or relationship (optional).",
+                    },
+                    "preferences": {
+                        "type": "string",
+                        "description": "Specific instructions or context on how to deal with this person (optional).",
+                    },
                 },
-                "required": ["stakeholder_id"]
-            }
-        }
-    }
+                "required": ["stakeholder_id"],
+            },
+        },
+    },
 ]
+
 
 def execute_tool(name: str, args: dict) -> str:
     funcs = {
         "add_stakeholder": add_stakeholder,
         "lookup_stakeholder": lookup_stakeholder,
         "remove_stakeholder": remove_stakeholder,
-        "update_stakeholder": update_stakeholder
+        "update_stakeholder": update_stakeholder,
     }
-    return funcs[name](**args) if name in funcs else json.dumps({"error": "Unknown tool"})
+    return (
+        funcs[name](**args) if name in funcs else json.dumps({"error": "Unknown tool"})
+    )

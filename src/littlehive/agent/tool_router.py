@@ -21,6 +21,7 @@ logging.getLogger("semantic_router").setLevel(logging.ERROR)
 from semantic_router import Route, SemanticRouter
 from semantic_router.encoders import HuggingFaceEncoder
 import semantic_router.utils.logger
+
 semantic_router.utils.logger.logger.setLevel(logging.ERROR)
 
 from littlehive.agent.tool_registry import ROUTE_SCHEMAS
@@ -53,8 +54,8 @@ calendar_route = Route(
         "change the time of my",
         "cancel my health slot",
         "cancel my appointment",
-        "clear my afternoon"
-    ]
+        "clear my afternoon",
+    ],
 )
 
 email_route = Route(
@@ -72,8 +73,8 @@ email_route = Route(
         "draft an email",
         "check my inbox",
         "clear my inbox",
-        "trash that email"
-    ]
+        "trash that email",
+    ],
 )
 
 finance_route = Route(
@@ -88,8 +89,8 @@ finance_route = Route(
         "mark this bill as paid",
         "I just paid the verizon bill",
         "show me my liabilities",
-        "track this payment"
-    ]
+        "track this payment",
+    ],
 )
 
 reminder_route = Route(
@@ -105,8 +106,8 @@ reminder_route = Route(
         "I paid the bill, you can close the reminder",
         "delete reminder",
         "wake me up at",
-        "ping me later about"
-    ]
+        "ping me later about",
+    ],
 )
 
 memory_route = Route(
@@ -123,15 +124,17 @@ memory_route = Route(
         "what was the name of that",
         "do you remember when",
         "who is my",
-        "what is my favorite"
-    ]
+        "what is my favorite",
+    ],
 )
 
 # Add future routes here
 routes = [calendar_route, email_route, finance_route, reminder_route, memory_route]
 
 # 2. Initialize the ultra-fast local embedding model
-logger.info("Loading semantic router encoder (sentence-transformers/all-MiniLM-L6-v2)...")
+logger.info(
+    "Loading semantic router encoder (sentence-transformers/all-MiniLM-L6-v2)..."
+)
 
 # Capture stdout and stderr to silence MLX and HuggingFace C++ level load reports
 old_stdout = sys.stdout
@@ -154,6 +157,7 @@ router_layer.add(routes)
 # 0.4 is a good general threshold. Default is often higher depending on the encoder.
 router_layer.set_threshold(0.3)
 
+
 def get_active_tools(user_input: str) -> list:
     """
     Takes the user's input, finds the most semantically relevant persona,
@@ -161,11 +165,11 @@ def get_active_tools(user_input: str) -> list:
     Defaults to the EA Persona tools to ensure core functionality is always available.
     """
     route_choice = router_layer(user_input)
-    
+
     # If we matched a specific persona route (e.g., developer, system) use those tools
     if route_choice and route_choice.name in ROUTE_SCHEMAS:
         return ROUTE_SCHEMAS[route_choice.name]
-        
+
     # Default to the core EA Persona if no specific route is matched,
     # or if we are just having a normal conversation (Mistral will just ignore the tools).
     # We grab it from any of the EA routes since they all point to the EA_PERSONA_TOOLS bundle now.

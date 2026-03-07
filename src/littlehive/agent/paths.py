@@ -12,6 +12,7 @@ SYSTEM_PROMPT_PATH = os.path.join(CONFIG_DIR, "system_prompt.md")
 TOKEN_PATH = os.path.join(CONFIG_DIR, "token.json")
 CREDENTIALS_PATH = os.path.join(CONFIG_DIR, "credentials.json")
 
+
 def ensure_paths():
     os.makedirs(DB_DIR, exist_ok=True)
     os.makedirs(CONFIG_DIR, exist_ok=True)
