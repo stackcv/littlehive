@@ -816,7 +816,7 @@ def main():
             logger.info("\nShutting down master brain...")
             sys.exit(0)
 
-        logger.info(f"📬 Received message from {task.get(\"source\")}: {task.get(\"text\")[:50]}...")
+        logger.info(f"📬 Received message from {task.get('source')}: {task.get('text')[:50]}...")
 
         source = task["source"]
         user_input = task["text"]
