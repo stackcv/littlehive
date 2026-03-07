@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LittleHive Dashboard</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <!-- Marked.js for Markdown Rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <script>
+        // Apply theme immediately to prevent Flash of Unstyled Content
+        if (localStorage.getItem('theme') === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+        }
+    </script>
+</head>
+<body>
+
+<div class="container-fluid">
+    <div class="row">
+        <!-- Sidebar -->
+        <nav class="col-md-2 sidebar d-md-block">
+            <h4 class="mb-4 text-primary"><i class="bi bi-hexagon-fill me-2"></i>LittleHive</h4>
+            <div class="nav flex-column nav-pills" id="v-pills-tab" role="tablist" aria-orientation="vertical">
+                <a class="nav-link active" id="tab-dashboard" data-bs-toggle="pill" href="#v-dashboard" role="tab" onclick="loadDashboard()">
+                    <i class="bi bi-speedometer2 me-2"></i>Dashboard & Chat
+                </a>
+                <a class="nav-link" id="tab-contacts" data-bs-toggle="pill" href="#v-contacts" role="tab" onclick="loadContacts()">
+                    <i class="bi bi-person-lines-fill me-2"></i>Contacts
+                </a>
+                
+                <hr class="text-muted my-2">
+                <small class="text-muted text-uppercase fw-bold mb-2 ps-3">Admin</small>
+                
+                <a class="nav-link" id="tab-memories" data-bs-toggle="pill" href="#v-memories" role="tab" onclick="loadMemories()">
+                    <i class="bi bi-brain me-2"></i>Memories
+                </a>
+                <a class="nav-link" id="tab-config" data-bs-toggle="pill" href="#v-config" role="tab" onclick="loadConfig()">
+                    <i class="bi bi-gear me-2"></i>Config
+                </a>
+                <a class="nav-link" id="tab-scheduler" data-bs-toggle="pill" href="#v-scheduler" role="tab" onclick="loadScheduler()">
+                    <i class="bi bi-clock-history me-2"></i>Tasks
+                </a>
+                <a class="nav-link" id="tab-tools" data-bs-toggle="pill" href="#v-tools" role="tab" onclick="loadTools()">
+                    <i class="bi bi-wrench-adjustable me-2"></i>Tools
+                </a>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="col-md-10 content">
+            
+            <div class="top-header">
+                <h5 id="page-title">Dashboard</h5>
+                <div class="agent-info" id="agent-info-bar">
+                    <i class="bi bi-robot"></i> <span id="agent-name">Loading...</span> | 
+                    <i class="bi bi-arrow-repeat"></i> Poll: <span id="agent-poll">...</span>m |
+                    <i class="bi bi-moon-fill theme-toggle ms-1" id="theme-toggle-btn" title="Toggle Dark Mode" onclick="toggleTheme()"></i>
+                </div>
+            </div>
+
+            <div class="tab-content" id="v-pills-tabContent">
+                
+                <!-- Dashboard Tab -->
+                <div class="tab-pane fade show active" id="v-dashboard" role="tabpanel">
+                    
+                    <!-- Top Widgets -->
+                    <div class="row mb-2">
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-header bg-white border-0 pt-3 pb-0">
+                                    <h6 class="card-title"><i class="bi bi-envelope text-primary me-2"></i>Pending Emails</h6>
+                                </div>
+                                <div class="card-body p-3 d-flex align-items-center justify-content-center">
+                                    <h3 class="mb-0" id="emails-count">...</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-header bg-white border-0 pt-3 pb-0">
+                                    <h6 class="card-title"><i class="bi bi-check-circle text-success me-2"></i>Pending Reminders</h6>
+                                </div>
+                                <div class="card-body p-3 d-flex align-items-center justify-content-center">
+                                    <h3 class="mb-0" id="reminders-count">...</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-header bg-white border-0 pt-3 pb-0">
+                                    <h6 class="card-title"><i class="bi bi-receipt text-warning me-2"></i>Pending Bills</h6>
+                                </div>
+                                <div class="card-body p-3 d-flex align-items-center justify-content-center">
+                                    <h3 class="mb-0" id="bills-count">...</h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Chat Section -->
+                    <div class="row mt-1">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header bg-white border-0 pt-2 d-flex align-items-center">
+                                    <h5 class="card-title mb-0 me-3">
+                                        <i class="bi bi-chat-dots me-2"></i>Agent Chat
+                                    </h5>
+                                </div>
+                                <div class="card-body pt-0">
+                                    <div id="chat-window">
+                                        <div class="text-center text-muted mt-5">Ready to assist you.</div>
+                                    </div>
+                                    <form id="chat-form" onsubmit="sendChatMessage(event)">
+                                        <div class="input-group">
+                                            <input type="text" id="chat-input" class="form-control" placeholder="Ask your agent to process emails, add reminders..." required autocomplete="off">
+                                            <button class="btn btn-primary" type="submit" id="chat-submit"><i class="bi bi-send"></i> Send</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Contacts Tab -->
+                <div class="tab-pane fade" id="v-contacts" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Manage Contacts</h5>
+                            <button class="btn btn-sm btn-primary" onclick="openContactModal()">
+                                <i class="bi bi-person-plus"></i> Add Contact
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Details</th>
+                                        <th>Role/Notes</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="contacts-table-body">
+                                    <tr><td colspan="4" class="text-center text-muted">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Add/Edit Contact Modal -->
+                <div class="modal fade" id="contactModal" tabindex="-1" aria-hidden="true">
+                  <div class="modal-dialog">
+                    <div class="modal-content">
+                      <div class="modal-header">
+                        <h5 class="modal-title" id="contactModalTitle">Add Contact</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                      </div>
+                      <div class="modal-body">
+                        <form id="contact-form">
+                            <input type="hidden" id="contact-id">
+                            <div class="mb-3">
+                                <label class="form-label">Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="contact-name" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Alias</label>
+                                <input type="text" class="form-control" id="contact-alias">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Email</label>
+                                <input type="email" class="form-control" id="contact-email">
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col">
+                                    <label class="form-label">Phone</label>
+                                    <input type="text" class="form-control" id="contact-phone">
+                                </div>
+                                <div class="col">
+                                    <label class="form-label">Telegram</label>
+                                    <input type="text" class="form-control" id="contact-telegram">
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Relationship</label>
+                                <input type="text" class="form-control" id="contact-relationship">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Preferences</label>
+                                <textarea class="form-control" id="contact-preferences" rows="2"></textarea>
+                            </div>
+                        </form>
+                      </div>
+                      <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" onclick="saveContact()">Save Contact</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Memories Tab -->
+                <div class="tab-pane fade" id="v-memories" role="tabpanel">
+                    <div class="card">
+                        <div class="card-body">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Memory</th>
+                                        <th>Timestamp</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="memories-table">
+                                    <tr><td colspan="2" class="text-muted">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Config Tab -->
+                <div class="tab-pane fade" id="v-config" role="tabpanel">
+                    <div class="card">
+                        <div class="card-body">
+                            <form id="config-form" onsubmit="saveConfig(event)">
+                                <div id="config-fields">
+                                    <p class="text-muted">Loading...</p>
+                                </div>
+                                <button type="submit" class="btn btn-primary mt-3">Save Changes</button>
+                                <span id="save-status" class="text-success ms-3" style="display:none;">Saved!</span>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Scheduler Tab -->
+                <div class="tab-pane fade" id="v-scheduler" role="tabpanel">
+                    <div class="card mb-3">
+                        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Background Schedulers</h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="scheduler-form" onsubmit="saveScheduler(event)">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-4">
+                                            <div class="form-check form-switch fs-5 mb-2">
+                                                <input class="form-check-input" type="checkbox" id="poll_reminders_enabled">
+                                                <label class="form-check-label" for="poll_reminders_enabled">Reminders & Tasks Poll</label>
+                                            </div>
+                                            <p class="text-muted small">Fires local DB reminders continuously.</p>
+                                            <div class="input-group input-group-sm mb-3 w-75">
+                                                <span class="input-group-text">Interval</span>
+                                                <input type="number" class="form-control" id="poll_reminders_interval" min="10" max="300">
+                                                <span class="input-group-text">seconds</span>
+                                            </div>
+                                        </div>
+
+                                        <div class="mb-4">
+                                            <div class="form-check form-switch fs-5 mb-2">
+                                                <input class="form-check-input" type="checkbox" id="poll_tasks_enabled">
+                                                <label class="form-check-label" for="poll_tasks_enabled">Background Async Executor</label>
+                                            </div>
+                                            <p class="text-muted small">Executes queued tools (sending emails, invites).</p>
+                                            <div class="input-group input-group-sm mb-3 w-75">
+                                                <span class="input-group-text">Interval</span>
+                                                <input type="number" class="form-control" id="poll_tasks_interval" min="1" max="60">
+                                                <span class="input-group-text">minutes</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-4">
+                                            <div class="form-check form-switch fs-5 mb-2">
+                                                <input class="form-check-input" type="checkbox" id="poll_apis_enabled">
+                                                <label class="form-check-label" id="poll_apis_label" for="poll_apis_enabled">External API Lookahead</label>
+                                            </div>
+                                            <p class="text-muted small">Checks Gmail/Calendar for new changes.</p>
+                                            <div class="input-group input-group-sm mb-1 w-75">
+                                                <span class="input-group-text">Interval</span>
+                                                <input type="number" class="form-control" id="poll_apis_interval" min="1" max="120">
+                                                <span class="input-group-text">minutes</span>
+                                            </div>
+                                            <small class="text-danger" style="font-size: 0.75rem;">⚠️ Keep &ge; 20 mins to avoid Google/Outlook rate limits.</small>
+                                        </div>
+                                        
+                                        <div class="mb-4">
+                                            <div class="form-check form-switch fs-5 mb-2">
+                                                <input class="form-check-input" type="checkbox" id="nightly_cleanup_enabled">
+                                                <label class="form-check-label" for="nightly_cleanup_enabled">Nightly DB Cleanup</label>
+                                            </div>
+                                            <p class="text-muted small">Prunes old logs, tasks, and reminders.</p>
+                                            <div class="input-group input-group-sm mb-3 w-75">
+                                                <span class="input-group-text">Time</span>
+                                                <input type="time" class="form-control" id="nightly_cleanup_time">
+                                            </div>
+                                        </div>
+
+                                        <div class="mb-4">
+                                            <div class="form-check form-switch fs-5 mb-2">
+                                                <input class="form-check-input" type="checkbox" id="nightly_memory_enabled">
+                                                <label class="form-check-label" for="nightly_memory_enabled">Nightly Chat Extraction</label>
+                                            </div>
+                                            <p class="text-muted small">AI scans daily chat to save core memories.</p>
+                                            <div class="input-group input-group-sm mb-3 w-75">
+                                                <span class="input-group-text">Time</span>
+                                                <input type="time" class="form-control" id="nightly_memory_time">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <hr>
+                                <div class="d-flex align-items-center">
+                                    <button type="submit" class="btn btn-primary">Save Settings</button>
+                                    <span id="save-scheduler-status" class="text-success ms-3" style="display:none;">Saved! (Requires Agent Restart)</span>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tools Tab -->
+                <div class="tab-pane fade" id="v-tools" role="tabpanel">
+                    <div class="card">
+                        <div class="card-body">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Tool Name</th>
+                                        <th>Category</th>
+                                        <th>Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tools-table-body">
+                                    <tr><td colspan="3" class="text-center text-muted">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+</div>
+
+<!-- Bootstrap Bundle with Popper -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    // Fetch and render Dashboard data
+    async function loadDashboard() {
+        document.getElementById('page-title').innerText = "Dashboard";
+        try {
+            const res = await fetch('/api/dashboard', { cache: 'no-store' });
+            const data = await res.json();
+            
+            // Reminders
+            const remCount = data.reminders ? data.reminders.length : 0;
+            document.getElementById('reminders-count').innerHTML = remCount === 0 ? '<span class="text-muted fs-5">0 reminders</span>' : `<span class="text-success">${remCount} reminder${remCount !== 1 ? 's' : ''}</span>`;
+
+            // Bills
+            const billCount = data.bills ? data.bills.length : 0;
+            document.getElementById('bills-count').innerHTML = billCount === 0 ? '<span class="text-muted fs-5">0 bills</span>' : `<span class="text-warning">${billCount} bill${billCount !== 1 ? 's' : ''}</span>`;
+            
+            // Emails
+            const emailCount = data.emails ? data.emails.length : 0;
+            document.getElementById('emails-count').innerHTML = emailCount === 0 ? '<span class="text-muted fs-5">Inbox Zero</span>' : `<span class="text-primary">${emailCount} email${emailCount !== 1 ? 's' : ''}</span>`;
+        } catch (e) {
+            console.error('Error loading dashboard', e);
+        }
+    }
+
+    // Fetch and render Memories
+    async function loadMemories() {
+        document.getElementById('page-title').innerText = "Core Memory";
+        try {
+            const res = await fetch('/api/memories', { cache: 'no-store' });
+            const data = await res.json();
+            
+            const table = document.getElementById('memories-table');
+            table.innerHTML = '';
+            if (!data.memories || data.memories.length === 0) {
+                table.innerHTML = '<tr><td colspan="2" class="text-muted">No memories found.</td></tr>';
+            } else {
+                data.memories.forEach(m => {
+                    table.innerHTML += `<tr>
+                        <td>${m.fact_text}</td>
+                        <td><small class="text-muted">${m.timestamp || ''}</small></td>
+                    </tr>`;
+                });
+            }
+        } catch (e) {
+            console.error('Error loading memories', e);
+        }
+    }
+
+    // Fetch and render Config
+    async function loadConfig() {
+        document.getElementById('page-title').innerText = "System Configuration";
+        try {
+            const res = await fetch('/api/config', { cache: 'no-store' });
+            const config = await res.json();
+
+            const container = document.getElementById('config-fields');
+            container.innerHTML = '';
+
+            for (const [key, value] of Object.entries(config)) {
+                container.innerHTML += `
+                    <div class="mb-3">
+                        <label class="form-label text-capitalize">${key.replace(/_/g, ' ')}</label>
+                        <input type="text" class="form-control" name="${key}" value="${value}" readonly>
+                    </div>
+                `;
+            }
+            // Hide the save button since config is readonly for now
+            document.querySelector('#config-form button[type="submit"]').style.display = 'none';
+        } catch(e) { console.error(e); }
+    }
+
+    async function loadContacts() {
+        document.getElementById('page-title').innerText = "Contacts Directory";
+        try {
+            const res = await fetch('/api/contacts', { cache: 'no-store' });
+            const contacts = await res.json();
+            const tbody = document.getElementById('contacts-table-body');
+            tbody.innerHTML = '';
+
+            if (contacts.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No contacts found.</td></tr>';
+                return;
+            }
+
+            contacts.forEach(contact => {
+                const encodedContact = encodeURIComponent(JSON.stringify(contact));
+                tbody.innerHTML += `
+                    <tr>
+                        <td class="fw-bold">${contact.name || '-'}<br><small class="text-muted">${contact.alias ? '(' + contact.alias + ')' : ''}</small></td>
+                        <td>
+                            <div><i class="bi bi-envelope me-1"></i> ${contact.email || '-'}</div>
+                            ${contact.phone ? `<div><i class="bi bi-telephone me-1"></i> ${contact.phone}</div>` : ''}
+                            ${contact.telegram ? `<div><i class="bi bi-telegram me-1"></i> ${contact.telegram}</div>` : ''}
+                        </td>
+                        <td class="text-muted">
+                            <div><strong>${contact.relationship || 'Contact'}</strong></div>
+                            ${contact.preferences ? `<small>${contact.preferences}</small>` : ''}
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-secondary me-1" onclick="openContactModal('${encodedContact}')">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteContact(${contact.id})">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+        } catch(e) { console.error(e); }
+    }
+
+    function openContactModal(encodedContact = null) {
+        document.getElementById('contact-form').reset();
+        document.getElementById('contact-id').value = '';
+        
+        if (encodedContact) {
+            document.getElementById('contactModalTitle').innerText = 'Edit Contact';
+            const contact = JSON.parse(decodeURIComponent(encodedContact));
+            document.getElementById('contact-id').value = contact.id;
+            document.getElementById('contact-name').value = contact.name || '';
+            document.getElementById('contact-alias').value = contact.alias || '';
+            document.getElementById('contact-email').value = contact.email || '';
+            document.getElementById('contact-phone').value = contact.phone || '';
+            document.getElementById('contact-telegram').value = contact.telegram || '';
+            document.getElementById('contact-relationship').value = contact.relationship || '';
+            document.getElementById('contact-preferences').value = contact.preferences || '';
+        } else {
+            document.getElementById('contactModalTitle').innerText = 'Add Contact';
+        }
+        
+        const modal = new bootstrap.Modal(document.getElementById('contactModal'));
+        modal.show();
+    }
+
+    async function saveContact() {
+        const id = document.getElementById('contact-id').value;
+        const data = {
+            name: document.getElementById('contact-name').value,
+            alias: document.getElementById('contact-alias').value,
+            email: document.getElementById('contact-email').value,
+            phone: document.getElementById('contact-phone').value,
+            telegram: document.getElementById('contact-telegram').value,
+            relationship: document.getElementById('contact-relationship').value,
+            preferences: document.getElementById('contact-preferences').value
+        };
+
+        if (!data.name) {
+            alert('Name is required');
+            return;
+        }
+
+        const method = id ? 'PUT' : 'POST';
+        const url = id ? `/api/contacts/${id}` : '/api/contacts';
+
+        try {
+            const res = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (res.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('contactModal')).hide();
+                loadContacts();
+            } else {
+                alert('Failed to save contact');
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Error saving contact');
+        }
+    }
+
+    async function deleteContact(id) {
+        if (!confirm('Are you sure you want to delete this contact?')) return;
+        
+        try {
+            const res = await fetch(`/api/contacts/${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                loadContacts();
+            } else {
+                alert('Failed to delete contact');
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Error deleting contact');
+        }
+    }
+
+    async function loadTools() {
+        document.getElementById('page-title').innerText = "Agent Tools (Read-Only)";
+        try {
+            const res = await fetch('/api/tools', { cache: 'no-store' });
+            const tools = await res.json();
+            const tbody = document.getElementById('tools-table-body');
+            tbody.innerHTML = '';
+
+            if (tools.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">No tools registered.</td></tr>';
+                return;
+            }
+
+            tools.forEach(tool => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td class="fw-bold"><i class="bi bi-gear-fill me-2 text-primary"></i>${tool.name}</td>
+                        <td><span class="badge bg-secondary">${tool.category}</span></td>
+                        <td class="text-muted" style="font-size: 0.9rem;">${tool.description}</td>
+                    </tr>
+                `;
+            });
+        } catch(e) { console.error(e); }
+    }
+
+    // Fetch and render Scheduler settings
+    async function loadScheduler() {
+        document.getElementById('page-title').innerText = "Scheduled Tasks";
+        try {
+            const res = await fetch('/api/config', { cache: 'no-store' });
+            const config = await res.json();
+            
+            document.getElementById('poll_reminders_enabled').checked = config.poll_reminders_enabled !== false;
+            document.getElementById('poll_reminders_interval').value = config.poll_reminders_interval || config.fast_polling_seconds || 30;
+
+            document.getElementById('poll_tasks_enabled').checked = config.poll_tasks_enabled !== false;
+            document.getElementById('poll_tasks_interval').value = config.poll_tasks_interval || 5;
+
+            document.getElementById('poll_apis_enabled').checked = config.poll_apis_enabled !== false;
+            document.getElementById('poll_apis_interval').value = config.poll_apis_interval || config.proactive_polling_minutes || 20;
+
+            if (!config.has_google_auth) {
+                document.getElementById('poll_apis_enabled').checked = false;
+                document.getElementById('poll_apis_enabled').disabled = true;
+                const lbl = document.getElementById('poll_apis_label');
+                if (!lbl.innerText.includes('Missing')) {
+                    lbl.innerText += " (Google Auth Missing)";
+                }
+            }
+
+            document.getElementById('nightly_cleanup_enabled').checked = config.nightly_cleanup_enabled !== false;
+            document.getElementById('nightly_cleanup_time').value = config.nightly_cleanup_time || "03:00";
+
+            document.getElementById('nightly_memory_enabled').checked = config.nightly_memory_enabled !== false;
+            document.getElementById('nightly_memory_time').value = config.nightly_memory_time || "03:15";
+
+        } catch(e) { console.error(e); }
+    }
+
+    async function saveScheduler(e) {
+        e.preventDefault();
+        const configData = {
+            poll_reminders_enabled: document.getElementById('poll_reminders_enabled').checked,
+            poll_reminders_interval: parseInt(document.getElementById('poll_reminders_interval').value, 10),
+            poll_tasks_enabled: document.getElementById('poll_tasks_enabled').checked,
+            poll_tasks_interval: parseInt(document.getElementById('poll_tasks_interval').value, 10),
+            poll_apis_enabled: document.getElementById('poll_apis_enabled').checked,
+            poll_apis_interval: parseInt(document.getElementById('poll_apis_interval').value, 10),
+            nightly_cleanup_enabled: document.getElementById('nightly_cleanup_enabled').checked,
+            nightly_cleanup_time: document.getElementById('nightly_cleanup_time').value,
+            nightly_memory_enabled: document.getElementById('nightly_memory_enabled').checked,
+            nightly_memory_time: document.getElementById('nightly_memory_time').value
+        };
+
+        try {
+            const res = await fetch('/api/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(configData)
+            });
+            if (res.ok) {
+                const status = document.getElementById('save-scheduler-status');
+                status.style.display = 'inline-block';
+                setTimeout(() => { status.style.display = 'none'; }, 3000);
+            }
+        } catch (e) {
+            console.error('Error saving scheduler config', e);
+        }
+    }
+
+    // Save Config
+    async function saveConfig(e) {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const configData = {};
+        formData.forEach((value, key) => {
+            if (!isNaN(value) && value.trim() !== '') {
+                configData[key] = Number(value);
+            } else {
+                configData[key] = value;
+            }
+        });
+
+        try {
+            const res = await fetch('/api/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(configData)
+            });
+            if (res.ok) {
+                const status = document.getElementById('save-status');
+                status.style.display = 'inline-block';
+                setTimeout(() => { status.style.display = 'none'; }, 2000);
+                initConfig(); // Refresh header
+            }
+        } catch (e) {
+            console.error('Error saving config', e);
+        }
+    }
+
+    // --- CHAT LOGIC ---
+    let chatBuffer = "";
+    let typingIndicator = null;
+    let cachedAgentName = "Assistant";
+    let cachedUserName = "User";
+    let typingInterval = null;
+    
+    // Fun facts/messages for long loading times
+    const thinkingMessages = [
+        "is analyzing your request...",
+        "is organizing the thought process...",
+        "is searching through local memory...",
+        "is double-checking the calendar...",
+        "is sifting through recent emails...",
+        "is drafting a thoughtful response...",
+        "is prioritizing your pending tasks...",
+        "is consulting the local model weights...",
+        "is making sure everything is perfect..."
+    ];
+
+
+    // --- THEME LOGIC ---
+    let isDarkMode = false;
+
+    function applyTheme(dark) {
+        isDarkMode = dark;
+        if (dark) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            const btn = document.getElementById('theme-toggle-btn'); if (btn) btn.classList.replace('bi-moon-fill', 'bi-sun-fill');
+        } else {
+            document.documentElement.removeAttribute('data-theme');
+            const btn = document.getElementById('theme-toggle-btn'); if (btn) btn.classList.replace('bi-sun-fill', 'bi-moon-fill');
+        }
+    }
+
+    async function toggleTheme() {
+        applyTheme(!isDarkMode);
+        
+        // Save locally for instant load next time
+        localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
+
+        // Persist to backend config so the agent remembers it
+        try {
+            await fetch('/api/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ dark_mode: isDarkMode })
+            });
+        } catch(e) {
+            console.error('Failed to save theme to config', e);
+        }
+    }
+
+    // Config + Agent details
+    async function initConfig() {
+
+        try {
+            const res = await fetch('/api/config', { cache: 'no-store' });
+            const config = await res.json();
+            cachedAgentName = config.agent_name || "Agent";
+            cachedUserName = config.user_name || "User";
+            document.getElementById('agent-name').innerText = cachedAgentName;
+            document.getElementById('agent-poll').innerText = config.proactive_polling_minutes || "30";
+            
+            // Apply theme from config (or fallback to local storage)
+            const localTheme = localStorage.getItem('theme');
+            if (config.dark_mode !== undefined) {
+                applyTheme(config.dark_mode);
+            } else if (localTheme === 'dark') {
+                applyTheme(true);
+            } else {
+                applyTheme(false);
+            }
+        } catch(e) { console.error(e); }
+    }
+
+    function appendMessage(text, isUser, isSystem = false) {
+        const chatWindow = document.getElementById('chat-window');
+        if (chatWindow.innerHTML.includes("Ready to assist you")) {
+            chatWindow.innerHTML = '';
+        }
+        
+        const msgDiv = document.createElement('div');
+        if (isSystem) {
+             msgDiv.className = 'chat-message mx-auto text-center text-muted';
+             msgDiv.style.fontSize = '0.85rem';
+             msgDiv.textContent = text;
+        } else {
+             msgDiv.className = 'chat-message ' + (isUser ? 'msg-user' : 'msg-assistant');
+             // Use marked.js for assistant messages, plain text for user
+             if (isUser) {
+                 msgDiv.textContent = text;
+             } else {
+                 msgDiv.innerHTML = marked.parse(text);
+             }
+        }
+        
+        chatWindow.appendChild(msgDiv);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+        return msgDiv;
+    }
+
+    function showTypingIndicator(show, customText = null) {
+        const chatWindow = document.getElementById('chat-window');
+        
+        // Stop any existing rotation
+        if (typingInterval) {
+            clearInterval(typingInterval);
+            typingInterval = null;
+        }
+
+        if (show) {
+            if (!typingIndicator) {
+                typingIndicator = document.createElement('div');
+                typingIndicator.className = 'chat-message msg-assistant';
+                typingIndicator.style.fontStyle = 'italic';
+                typingIndicator.style.opacity = '0.7';
+                chatWindow.appendChild(typingIndicator);
+            }
+            
+            const updateText = (text) => {
+                typingIndicator.innerHTML = `<span class="spinner-grow spinner-grow-sm me-2" role="status"></span> ${text}`;
+                chatWindow.scrollTop = chatWindow.scrollHeight;
+            };
+
+            if (customText) {
+                updateText(customText);
+            } else {
+                // Initial message
+                updateText(`${cachedAgentName} is thinking...`);
+                
+                // Start cycling engaging messages every 8 seconds
+                let messageIndex = 0;
+                typingInterval = setInterval(() => {
+                    // Randomize a little to make it feel natural
+                    const msg = thinkingMessages[Math.floor(Math.random() * thinkingMessages.length)];
+                    updateText(`${cachedAgentName} ${msg}`);
+                }, 8000);
+            }
+            
+        } else if (typingIndicator) {
+            typingIndicator.remove();
+            typingIndicator = null;
+        }
+    }
+
+    async function sendChatMessage(e) {
+        e.preventDefault();
+        const input = document.getElementById('chat-input');
+        const msg = input.value;
+        if (!msg.trim()) return;
+
+        // Frontend Only Slash Commands
+        if (msg.trim().toLowerCase() === '/clear') {
+            document.getElementById('chat-window').innerHTML = '<div class="text-center text-muted mt-5">Ready to assist you.</div>';
+            input.value = '';
+            return;
+        }
+
+        appendMessage(msg, true);
+        input.value = '';
+        chatBuffer = ""; // Reset buffer
+
+        const btn = document.getElementById('chat-submit');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+        
+        showTypingIndicator(true);
+
+        try {
+            await fetch('/api/chat/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: msg })
+            });
+        } catch(e) {
+            showTypingIndicator(false);
+            appendMessage("Error: Could not reach backend.", false);
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-send"></i> Send';
+        }
+    }
+
+    // Long polling for chat responses
+    async function pollChat() {
+        try {
+            const res = await fetch('/api/chat/poll', { cache: 'no-store' });
+            if (res.status === 200) {
+                const data = await res.json();
+                if (data && data.type) {
+                    const btn = document.getElementById('chat-submit');
+                    
+                    if (data.type === "chunk") {
+                        chatBuffer += data.content;
+                        // Still show typing indicator while chunks arrive
+                        showTypingIndicator(true);
+                    } 
+                    else if (data.type === "tool_start") {
+                        showTypingIndicator(true, "Executing tools...");
+                    }
+                    else if (data.type === "done") {
+                        showTypingIndicator(false);
+                        if (chatBuffer.trim()) {
+                            appendMessage(chatBuffer, false);
+                        }
+                        chatBuffer = "";
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="bi bi-send"></i> Send';
+                        loadDashboard(); // Refresh background data!
+                    }
+                    else if (data.type === "error") {
+                        showTypingIndicator(false);
+                        appendMessage("<span class='text-danger'>Error: " + data.content + "</span>", false);
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="bi bi-send"></i> Send';
+                        chatBuffer = "";
+                    }
+                    else if (data.type === "proactive_start") {
+                        // For proactive, we just start the buffer and show indicator
+                        chatBuffer = "";
+                        showTypingIndicator(true, "Proactive Update...");
+                    }
+                }
+            }
+        } catch (e) {
+            // Silently wait and retry if server is busy
+        }
+        
+        // Loop continuously
+        setTimeout(pollChat, 500);
+    }
+
+    // Initial load
+    document.addEventListener("DOMContentLoaded", () => {
+        initConfig();
+        loadDashboard();
+        pollChat();
+    });
+</script>
+</body>
+</html>

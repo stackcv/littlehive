@@ -4,25 +4,20 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "littlehive"
-version = "0.5.5"
+version = "0.6.0"
 description = "LittleHive local-first multi-agent assistant foundation"
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [{name = "LittleHive"}]
 license = {text = "MIT"}
 dependencies = [
-  "pydantic>=2.6",
-  "sqlalchemy>=2.0",
-  "alembic>=1.13",
-  "fastapi>=0.110",
-  "uvicorn>=0.29",
-  "httpx>=0.27",
-  "tenacity>=8.2",
-  "structlog>=24.1",
-  "PyYAML>=6.0",
-  "python-telegram-bot>=21.0",
-  "nicegui>=2.0",
-  "groq>=0.11"
+  "google-auth-httplib2",
+  "google-auth-oauthlib",
+  "google-api-python-client",
+  "sentence-transformers",
+  "scikit-learn",
+  "mlx-lm",
+  "apscheduler"
 ]
 
 [project.optional-dependencies]
@@ -30,30 +25,15 @@ dev = [
   "ruff>=0.4",
   "build>=1.2",
   "twine>=5.1",
-  "pytest>=8.0",
-  "pytest-asyncio>=0.23"
+  "pytest>=8.0"
 ]
 
 [project.scripts]
-littlehive-onboard = "littlehive.apps.onboarding_cli:main"
-littlehive-api = "littlehive.apps.api_server:main"
-littlehive-telegram = "littlehive.apps.telegram_worker:main"
-littlehive-diag = "littlehive.apps.diagnostics_cli:main"
-littlehive-supervisor = "littlehive.apps.supervisor:main"
-littlehive-dashboard = "littlehive.apps.dashboard:main"
-littlehive-run = "littlehive.apps.run:main"
-littlehive-reset = "littlehive.apps.reset:main"
-lhive = "littlehive.apps.short_cli:main"
-lh-run = "littlehive.apps.run:main"
-lh-reset = "littlehive.apps.reset:main"
+lhive = "littlehive.cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
+include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[tool.pytest.ini_options]
-pythonpath = ["src"]
-testpaths = ["tests"]
-asyncio_mode = "auto"
