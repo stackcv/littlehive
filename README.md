@@ -2,7 +2,7 @@
 
 **A private, local-first AI assistant built exclusively for Apple Silicon.**
 
-LittleHive is your personal AI agent that runs entirely on your Mac. Powered by Mistral's highly capable **Ministral 3B** model running natively via Apple's **MLX** framework, LittleHive ensures that your data, emails, and schedule are processed locally and completely privately.
+LittleHive is your personal AI agent that runs entirely on your Mac. Powered by Mistral's highly capable **Ministral 8B or 14B** model running natively via Apple's **MLX** framework, LittleHive ensures that your data, emails, and schedule are processed locally and completely privately.
 
 No cloud processing for the AI. No subscription fees. Just a fast, intelligent assistant living on your machine.
 
@@ -10,7 +10,7 @@ No cloud processing for the AI. No subscription fees. Just a fast, intelligent a
 
 ## ✨ Major Features
 
-*   **100% Local AI:** Uses Apple's MLX to run the Ministral 3B model directly on your hardware, ensuring lightning-fast responses and absolute privacy.
+*   **100% Local AI:** Uses Apple's MLX to run the Ministral 8B or 14B model directly on your hardware, ensuring lightning-fast responses and absolute privacy.
 *   **Google Workspace Integration:** Securely connects to your Gmail and Google Calendar to read, draft, send emails, and manage your daily schedule.
 *   **Proactive Assistant:** Runs quietly in the background. It polls for new events, handles scheduled reminders, and manages tasks without you having to constantly prompt it.
 *   **Long-Term Memory:** Automatically extracts and remembers context from your past conversations, becoming more personalized over time.
