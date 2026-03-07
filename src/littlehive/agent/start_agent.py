@@ -657,10 +657,7 @@ def get_system_prompt():
     offset_str = f"{sign}{abs(offset_hours):02d}:{abs(offset_mins):02d}"
     default_tz = f"{time.tzname[time.localtime().tm_isdst]} (UTC{offset_str})"
 
-    from littlehive.agent.paths import SYSTEM_PROMPT_PATH
-
-    if not os.path.exists(SYSTEM_PROMPT_PATH):
-        default_prompt = """# Layer 1 — Identity Prompt
+        template = """# Layer 1 — Identity Prompt
 
 ## Role & Mission
 You are {agent_name}, a highly efficient, hyper-competent, and fiercely decisive Senior Executive Assistant ({agent_title}) working for {user_name}. Your primary goal is to **minimize the user's cognitive load**. You do not just read data; you Triage, Summarize, and Execute autonomously.
@@ -734,12 +731,6 @@ Whenever you send an email or create a calendar invite using your tools, you MUS
 - **Timezone:** {timezone}
 - **Location:** {location}
 """
-        with open(SYSTEM_PROMPT_PATH, "w") as f:
-            f.write(default_prompt)
-
-    with open(SYSTEM_PROMPT_PATH, "r") as f:
-        template = f.read()
-
     return template.format(
         date=datetime.now().strftime("%A, %B %d, %Y"),
         timezone=os.environ.get("AGENT_TIMEZONE", default_tz),

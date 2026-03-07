@@ -23,7 +23,7 @@
     <div class="row">
         <!-- Sidebar -->
         <nav class="col-md-2 sidebar d-md-block">
-            <h4 class="mb-4 text-primary"><i class="bi bi-hexagon-fill me-2"></i>LittleHive</h4>
+            <h4 class="mb-4 text-primary">🐝 LittleHive</h4>
             <div class="nav flex-column nav-pills" id="v-pills-tab" role="tablist" aria-orientation="vertical">
                 <a class="nav-link active" id="tab-dashboard" data-bs-toggle="pill" href="#v-dashboard" role="tab" onclick="loadDashboard()">
                     <i class="bi bi-speedometer2 me-2"></i>Dashboard & Chat
@@ -42,10 +42,7 @@
                     <i class="bi bi-gear me-2"></i>Config
                 </a>
                 <a class="nav-link" id="tab-scheduler" data-bs-toggle="pill" href="#v-scheduler" role="tab" onclick="loadScheduler()">
-                    <i class="bi bi-clock-history me-2"></i>Tasks
-                </a>
-                <a class="nav-link" id="tab-tools" data-bs-toggle="pill" href="#v-tools" role="tab" onclick="loadTools()">
-                    <i class="bi bi-wrench-adjustable me-2"></i>Tools
+                    <i class="bi bi-clock-history me-2"></i>Scheduler
                 </a>
             </div>
         </nav>
@@ -56,8 +53,8 @@
             <div class="top-header">
                 <h5 id="page-title">Dashboard</h5>
                 <div class="agent-info" id="agent-info-bar">
-                    <i class="bi bi-robot"></i> <span id="agent-name">Loading...</span> | 
-                    <i class="bi bi-arrow-repeat"></i> Poll: <span id="agent-poll">...</span>m |
+                    <span id="agent-status-dot" style="display:inline-block;width:10px;height:10px;border-radius:50%;background-color:#ccc;margin-right:5px;"></span><span id="agent-status-text" class="me-3">Connecting...</span> <i class="bi bi-robot"></i> <span id="agent-name">Loading...</span> | 
+                    
                     <i class="bi bi-moon-fill theme-toggle ms-1" id="theme-toggle-btn" title="Toggle Dark Mode" onclick="toggleTheme()"></i>
                 </div>
             </div>
@@ -251,7 +248,7 @@
                                         <div class="mb-4">
                                             <div class="form-check form-switch fs-5 mb-2">
                                                 <input class="form-check-input" type="checkbox" id="poll_reminders_enabled">
-                                                <label class="form-check-label" for="poll_reminders_enabled">Reminders & Tasks Poll</label>
+                                                <label class="form-check-label" for="poll_reminders_enabled">Reminders & Scheduler Poll</label>
                                             </div>
                                             <p class="text-muted small">Fires local DB reminders continuously.</p>
                                             <div class="input-group input-group-sm mb-3 w-75">
@@ -324,25 +321,6 @@
                     </div>
                 </div>
 
-                <!-- Tools Tab -->
-                <div class="tab-pane fade" id="v-tools" role="tabpanel">
-                    <div class="card">
-                        <div class="card-body">
-                            <table class="table table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Tool Name</th>
-                                        <th>Category</th>
-                                        <th>Description</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="tools-table-body">
-                                    <tr><td colspan="3" class="text-center text-muted">Loading...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
 
             </div>
         </main>
@@ -354,6 +332,28 @@
 
 <script>
     // Fetch and render Dashboard data
+    async function checkConnectionStatus() {
+        try {
+            const res = await fetch("/api/health", { cache: "no-store", signal: AbortSignal.timeout(3000) });
+            const data = await res.json();
+            const dot = document.getElementById("agent-status-dot");
+            const text = document.getElementById("agent-status-text");
+            if (data.status === "ok") {
+                dot.style.backgroundColor = "#28a745";
+                text.innerText = "Connected";
+            } else {
+                dot.style.backgroundColor = "#dc3545";
+                text.innerText = "Error";
+            }
+        } catch (e) {
+            const dot = document.getElementById("agent-status-dot");
+            const text = document.getElementById("agent-status-text");
+            dot.style.backgroundColor = "#dc3545";
+            text.innerText = "Disconnected";
+        }
+        setTimeout(checkConnectionStatus, 5000);
+    }
+
     async function loadDashboard() {
         document.getElementById('page-title').innerText = "Dashboard";
         try {
@@ -408,16 +408,19 @@
             const config = await res.json();
 
             const container = document.getElementById('config-fields');
-            container.innerHTML = '';
+            container.innerHTML = '<div class="row">';
+            let itemsHTML = '';
 
             for (const [key, value] of Object.entries(config)) {
-                container.innerHTML += `
-                    <div class="mb-3">
+                if (key.startsWith('poll_')) continue; // skip scheduler settings
+                itemsHTML += `
+                    <div class="col-md-6 mb-3">
                         <label class="form-label text-capitalize">${key.replace(/_/g, ' ')}</label>
                         <input type="text" class="form-control" name="${key}" value="${value}" readonly>
                     </div>
                 `;
             }
+            container.innerHTML += itemsHTML + '</div>';
             // Hide the save button since config is readonly for now
             document.querySelector('#config-form button[type="submit"]').style.display = 'none';
         } catch(e) { console.error(e); }
@@ -568,7 +571,7 @@
 
     // Fetch and render Scheduler settings
     async function loadScheduler() {
-        document.getElementById('page-title').innerText = "Scheduled Tasks";
+        document.getElementById('page-title').innerText = "Scheduled Scheduler";
         try {
             const res = await fetch('/api/config', { cache: 'no-store' });
             const config = await res.json();
@@ -869,6 +872,8 @@
                         chatBuffer = "";
                         btn.disabled = false;
                         btn.innerHTML = '<i class="bi bi-send"></i> Send';
+        checkConnectionStatus();
+
                         loadDashboard(); // Refresh background data!
                     }
                     else if (data.type === "error") {
@@ -896,6 +901,8 @@
     // Initial load
     document.addEventListener("DOMContentLoaded", () => {
         initConfig();
+        checkConnectionStatus();
+
         loadDashboard();
         pollChat();
     });

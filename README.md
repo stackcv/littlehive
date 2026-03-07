@@ -93,7 +93,6 @@ You can easily tweak LittleHive's behavior via the Web Dashboard or by editing t
 
 **Simple settings you can change:**
 *   **AI Model:** Switch to a different MLX-compatible model (e.g., swapping between 8B and 14B versions depending on your Mac's RAM).
-*   **System Prompt:** Edit the `system_prompt.md` file to give your assistant a custom name, change its personality, or set strict rules on how it should reply.
 *   **User Details:** Add your name, timezone, and personal preferences so the AI has better context when helping you.
 *   **Polling Intervals:** Adjust how often the background agent checks for new emails or upcoming calendar events.
 

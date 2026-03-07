@@ -111,6 +111,13 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
                 )
             return
 
+        elif self.path == "/api/health":
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"status": "ok"}).encode())
+            return
+
         elif self.path == "/api/chat/poll":
             self.send_response(200)
             self.send_header("Content-type", "application/json")
