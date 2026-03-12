@@ -81,14 +81,11 @@ async function loadDashboard() {
         const res = await fetch('/api/dashboard', { cache: 'no-store' });
         const data = await res.json();
 
-        const remCount = data.reminders ? data.reminders.length : 0;
-        document.getElementById('reminders-count').innerText = remCount;
-
-        const billCount = data.bills ? data.bills.length : 0;
-        document.getElementById('bills-count').innerText = billCount;
-
-        const emailCount = data.emails ? data.emails.length : 0;
-        document.getElementById('emails-count').innerText = emailCount === 0 ? "0" : emailCount;
+        document.getElementById('emails-count').innerText = data.emails ? data.emails.length : 0;
+        document.getElementById('events-count').innerText = data.events ? data.events.length : 0;
+        document.getElementById('reminders-count').innerText = data.reminders ? data.reminders.length : 0;
+        document.getElementById('tasks-count').innerText = data.pending_tasks ? data.pending_tasks.length : 0;
+        document.getElementById('bills-count').innerText = data.bills ? data.bills.length : 0;
     } catch (e) {
         console.error('Error loading dashboard', e);
     }
@@ -197,6 +194,7 @@ async function loadConfig() {
                     <div class="mb-3">
                         <label class="form-label">Model <small class="attention-text ms-1">Requires restart</small></label>
                         <select class="form-select" name="model_path">
+                            <option value="mlx-community/Ministral-3-3B-Instruct-2512-4bit" ${config.model_path === 'mlx-community/Ministral-3-3B-Instruct-2512-4bit' ? 'selected' : ''}>Ministral 3B Lite (4-bit)</option>
                             <option value="mlx-community/Ministral-3-8B-Instruct-2512-4bit" ${config.model_path === 'mlx-community/Ministral-3-8B-Instruct-2512-4bit' ? 'selected' : ''}>Ministral 8B (4-bit)</option>
                             <option value="mlx-community/mistralai_Ministral-3-14B-Instruct-2512-MLX-MXFP4" ${config.model_path === 'mlx-community/mistralai_Ministral-3-14B-Instruct-2512-MLX-MXFP4' ? 'selected' : ''}>Ministral 14B (MXFP4)</option>
                         </select>
@@ -501,6 +499,7 @@ function friendlyModelName(modelPath) {
     if (!modelPath) return 'Unknown';
     if (modelPath.includes('14B')) return 'Ministral 14B';
     if (modelPath.includes('8B')) return 'Ministral 8B';
+    if (modelPath.includes('3B')) return 'Ministral 3B Lite';
     const parts = modelPath.split('/');
     return parts[parts.length - 1].substring(0, 20);
 }
@@ -621,6 +620,7 @@ async function sendChatMessage(e) {
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span>';
 
+    appendMessage(displayMsg, true);
     showTypingIndicator(true);
 
     try {
@@ -650,7 +650,7 @@ async function pollChat() {
                     const btn = document.getElementById('chat-submit');
 
                     if (msg.type === "user") {
-                        appendMessage(msg.content, true);
+                        // Already rendered client-side in sendChatMessage; skip
                     }
                     else if (msg.type === "tool_start") {
                         const label = toolStartText(msg.tools);

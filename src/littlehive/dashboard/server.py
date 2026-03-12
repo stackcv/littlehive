@@ -79,12 +79,38 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
                 else:
                     reminders = []
 
+                # Pending tasks from queue
+                cursor.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='pending_tasks'"
+                )
+                if cursor.fetchone():
+                    cursor.execute(
+                        "SELECT * FROM pending_tasks WHERE status IN ('queued', 'failed') ORDER BY created_at DESC"
+                    )
+                    pending_tasks = cursor.fetchall()
+                else:
+                    pending_tasks = []
+
+                # Upcoming events from cache
+                cursor.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='cached_events'"
+                )
+                if cursor.fetchone():
+                    from datetime import datetime
+                    now_iso = datetime.now().astimezone().isoformat()
+                    cursor.execute(
+                        "SELECT * FROM cached_events WHERE start_time >= ? ORDER BY start_time ASC LIMIT 10",
+                        (now_iso[:10],)
+                    )
+                    events = cursor.fetchall()
+                else:
+                    events = []
+
                 conn.close()
 
                 # Fetch unread emails
                 unread_emails = []
                 try:
-
                     from littlehive.tools.email_tools import search_emails
 
                     email_res_str = search_emails(
@@ -100,11 +126,13 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
                         "bills": bills,
                         "reminders": reminders,
                         "emails": unread_emails,
+                        "events": events,
+                        "pending_tasks": pending_tasks,
                     }
                 ).encode("utf-8")
             except Exception as e:
                 response_data = json.dumps(
-                    {"error": str(e), "bills": [], "reminders": [], "emails": []}
+                    {"error": str(e), "bills": [], "reminders": [], "emails": [], "events": [], "pending_tasks": []}
                 ).encode("utf-8")
             
             self.send_response(200)

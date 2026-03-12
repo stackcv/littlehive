@@ -373,6 +373,8 @@ def process_pending_tasks_job():
             args = json.loads(task["arguments"])
             retry_count = task["retry_count"]
 
+            logger.info(f"[TaskQueue] Processing task #{task_id}: {tool_name}")
+
             cursor.execute(
                 "UPDATE pending_tasks SET status='processing' WHERE id=?", (task_id,)
             )
@@ -380,6 +382,7 @@ def process_pending_tasks_job():
 
             func = executors.get(tool_name)
             if not func:
+                logger.warning(f"[TaskQueue] Unknown tool '{tool_name}' for task #{task_id}")
                 cursor.execute(
                     "UPDATE pending_tasks SET status='failed', error_message='Unknown tool' WHERE id=?",
                     (task_id,),
@@ -398,6 +401,7 @@ def process_pending_tasks_job():
                     except json.JSONDecodeError:
                         pass
 
+                logger.info(f"[TaskQueue] Task #{task_id} ({tool_name}) completed successfully")
                 cursor.execute(
                     "UPDATE pending_tasks SET status='completed', error_message=NULL WHERE id=?",
                     (task_id,),
@@ -405,6 +409,7 @@ def process_pending_tasks_job():
                 conn.commit()
             except Exception as e:
                 error_msg = str(e)
+                logger.error(f"[TaskQueue] Task #{task_id} ({tool_name}) failed: {error_msg}")
                 new_retry = retry_count + 1
                 if new_retry >= 3:
                     cursor.execute(

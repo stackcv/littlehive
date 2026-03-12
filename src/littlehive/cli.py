@@ -14,13 +14,19 @@ LOG_FILE = os.path.join(LITTLEHIVE_DIR, "logs", "agent.log")
 AVAILABLE_MODELS = [
     {
         "key": "1",
-        "name": "Ministral-3-8B-Instruct-2512",
-        "path": "mlx-community/Ministral-3-8B-Instruct-2512-4bit",
+        "name": "Ministral 3B Lite",
+        "path": "mlx-community/Ministral-3-3B-Instruct-2512-4bit",
         "ram": "8GB+",
     },
     {
         "key": "2",
-        "name": "Ministral-3-14B-Instruct-2512",
+        "name": "Ministral 8B",
+        "path": "mlx-community/Ministral-3-8B-Instruct-2512-4bit",
+        "ram": "8GB+",
+    },
+    {
+        "key": "3",
+        "name": "Ministral 14B",
         "path": "mlx-community/mistralai_Ministral-3-14B-Instruct-2512-MLX-MXFP4",
         "ram": "16GB+",
     },
