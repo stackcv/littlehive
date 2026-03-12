@@ -141,7 +141,7 @@ REMINDER_TOOLS_SCHEMA = [
         "type": "function",
         "function": {
             "name": "set_reminder",
-            "description": "Set a reminder for the user. Use this when the user asks to be reminded of a task or bill.",
+            "description": "Set a personal reminder. The system automatically notifies the user via Telegram and the web dashboard when the time arrives. Use this for all time-based reminders and follow-ups.",
             "parameters": {
                 "type": "object",
                 "properties": {

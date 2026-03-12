@@ -5,30 +5,60 @@ on:
   pull_request:
 
 jobs:
-  test:
+  lint-and-build:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install
+
+      - name: Install dev tooling
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          pip install ruff build
+
       - name: Lint
         run: ruff check src
-      - name: Build
+
+      - name: Build package
         run: python -m build
-      - name: Run lhive CLI smoke
+
+      - name: Verify package installs cleanly
+        run: pip install dist/*.whl --no-deps
+
+      - name: CLI smoke test
         run: |
-          # The command should be installed and print usage
-          OUTPUT=$(lhive 2>&1 || true)
+          OUTPUT=$(python -m littlehive.cli 2>&1 || true)
           echo "$OUTPUT"
           if [[ "$OUTPUT" != *"Usage: lhive"* ]]; then
-            echo "lhive command not found or did not output usage"
+            echo "CLI did not produce expected usage output"
             exit 1
           fi
+
+      - name: Version consistency check
+        run: |
+          python - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          data = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+          toml_ver = data["project"]["version"]
+
+          init_path = Path("src/littlehive/__init__.py")
+          init_ver = None
+          for line in init_path.read_text().splitlines():
+              if line.startswith("__version__"):
+                  init_ver = line.split("=")[1].strip().strip('"').strip("'")
+                  break
+
+          if init_ver and init_ver != toml_ver:
+              raise SystemExit(
+                  f"Version mismatch: pyproject.toml={toml_ver} __init__.py={init_ver}"
+              )
+          print(f"Version consistent: {toml_ver}")
+          PY

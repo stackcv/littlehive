@@ -1,36 +1,38 @@
 # LittleHive 🐝
 
-**A private, local-first AI assistant built exclusively for Apple Silicon.**
+**A private, local-first AI executive assistant built exclusively for Apple Silicon.**
 
-LittleHive is your personal AI agent that runs entirely on your Mac. Powered by Mistral's highly capable **Ministral 8B or 14B** model running natively via Apple's **MLX** framework, LittleHive ensures that your data, emails, and schedule are processed locally and completely privately.
+LittleHive runs entirely on your Mac — powered by Mistral's **Ministral 8B or 14B** model via Apple's **MLX** framework. Your emails, calendar, and personal data never leave your machine.
 
-No cloud processing for the AI. No subscription fees. Just a fast, intelligent assistant living on your machine.
+No cloud AI. No subscription. Just a fast, intelligent assistant on your hardware.
 
 ---
 
-## ✨ Major Features
+## ✨ Features
 
-*   **100% Local AI:** Uses Apple's MLX to run the Ministral 8B or 14B model directly on your hardware, ensuring lightning-fast responses and absolute privacy.
-*   **Google Workspace Integration:** Securely connects to your Gmail and Google Calendar to read, draft, send emails, and manage your daily schedule.
-*   **Proactive Assistant:** Runs quietly in the background. It polls for new events, handles scheduled reminders, and manages tasks without you having to constantly prompt it.
-*   **Long-Term Memory:** Automatically extracts and remembers context from your past conversations, becoming more personalized over time.
-*   **Web Dashboard:** Includes a clean, built-in local web interface to chat with your assistant, monitor background tasks, and easily manage your settings.
+- **100% Local AI** — Runs Ministral 8B/14B natively on Apple Silicon via MLX with KV prompt caching for sub-second responses.
+- **Google Workspace** — Connects to Gmail, Google Calendar, and Google Tasks. Read, draft, send emails; create events; manage tasks.
+- **Web Search** — Search the web via DuckDuckGo for current events, prices, or facts the model isn't confident about.
+- **Proactive Scheduling** — Background threads poll for new emails, fire reminders on time, and sync your calendar automatically.
+- **Long-Term Memory** — Remembers important facts across conversations. Nightly extraction saves key details from your chats.
+- **Contacts Directory** — Manage stakeholders with optional auto-reply drafting for trusted contacts.
+- **Finance Tracking** — Track bills, due dates, and mark payments as they come in.
+- **Telegram Bot** — Chat with your assistant from Telegram with typing indicators and chat ID authorization.
+- **Web Dashboard** — A local web interface with real-time chat, context usage monitoring, dark mode, and full configuration.
+- **Self-Updating** — Check for and install updates directly from PyPI with a single command.
 
 ---
 
 ## 💻 Requirements
 
-*   **Hardware:** An Apple Silicon Mac (M1, M2, M3, or M4 series). *Intel Macs are not supported.*
-*   **Software:** macOS with Python 3.11 or higher installed.
+- **Hardware:** Apple Silicon Mac (M1, M2, M3, or M4). Intel Macs are not supported.
+- **Software:** macOS with Python 3.11+.
 
 ---
 
 ## 🚀 Installation
 
-It is highly recommended to install LittleHive inside an isolated Python "virtual environment" to keep your system clean.
-
-**1. Create and activate a virtual environment:**
-Open your terminal and run:
+**1. Create a virtual environment:**
 ```bash
 python3 -m venv littlehive-env
 source littlehive-env/bin/activate
@@ -41,68 +43,103 @@ source littlehive-env/bin/activate
 pip install littlehive
 ```
 
----
-
-## 🕹️ Usage
-
-Once installed, managing your assistant is incredibly simple using the `lhive` command.
-
-**Start the Assistant:**
+**3. Run the setup wizard:**
 ```bash
-lhive start
-```
-*Note: The first time you start LittleHive, it will download the Ministral AI model. This might take a few minutes depending on your internet connection.*
-
-**Access the Dashboard:**
-Once the assistant is awake, open your web browser and navigate to:
-👉 **[http://localhost:8080](http://localhost:8080)**
-
-**Stop the Assistant:**
-```bash
-lhive stop
+lhive setup
 ```
 
-*(You can also use `lhive restart` to quickly reboot the agent).*
+The wizard walks you through identity, Google OAuth, Telegram, model selection, and preferences. Takes about 2 minutes.
 
 ---
 
-## 💬 What can you ask LittleHive?
+## 🕹️ CLI Commands
 
-Because LittleHive is deeply integrated with your local environment and Google Workspace, you can ask it to perform complex, multi-step tasks natively:
+```
+lhive setup          Interactive setup wizard (run this first)
+lhive start          Start the agent in the background
+lhive stop           Stop the agent
+lhive restart        Restart the agent
+lhive status         Show agent status and configuration
+lhive update         Check for and install updates from PyPI
+lhive version        Show current version
+lhive auth google    Re-run Google OAuth flow
+```
 
-*   **Email Management:**
-    *   *"Do I have any unread emails from my manager?"*
-    *   *"Draft a polite reply to Sarah saying I'll have the report ready by Friday, and send it."*
-    *   *"Archive all the newsletter emails I received today."*
-*   **Calendar & Scheduling:**
-    *   *"What does my schedule look like tomorrow morning?"*
-    *   *"Block out 2 hours for deep work this afternoon."*
-    *   *"Schedule a 30-minute sync with Alex for next Tuesday at 10 AM."*
-*   **Reminders & Tasks:**
-    *   *"Remind me to check the oven in 45 minutes."*
-    *   *"Set a reminder to follow up on the marketing budget next Monday at 9 AM."*
-*   **Memory & Context:**
-    *   *"What was the name of the restaurant John recommended to me last week?"*
-    *   *"Summarize the key points from our conversation yesterday regarding the new project."*
+The first `lhive start` downloads the AI model (~4–8 GB). Subsequent starts are instant.
 
 ---
 
-## ⚙️ Customizing LittleHive
+## 🖥️ Dashboard
 
-You can easily tweak LittleHive's behavior via the Web Dashboard or by editing the configuration files in `~/.littlehive/config/`. 
+Once the agent is running, open your browser:
 
-**Simple settings you can change:**
-*   **AI Model:** Switch to a different MLX-compatible model (e.g., swapping between 8B and 14B versions depending on your Mac's RAM).
-*   **User Details:** Add your name, timezone, and personal preferences so the AI has better context when helping you.
-*   **Polling Intervals:** Adjust how often the background agent checks for new emails or upcoming calendar events.
+👉 **http://localhost:8080**
+
+The dashboard includes:
+- **Chat** — Talk to your assistant with real-time tool indicators
+- **Contacts** — Manage your contacts directory and auto-reply settings
+- **Memories** — View, edit, or delete facts the agent has memorized
+- **Settings** — Configure identity, model, Telegram, and Do Not Disturb hours
+- **Scheduler** — Control background jobs (reminders, API sync, nightly cleanup)
+- **Top Bar** — Live clock, context usage %, model name, connection status
 
 ---
 
-## 📂 Where is my data?
+## 💬 What Can You Ask?
 
-LittleHive believes your data belongs to you. Everything is stored locally in your home directory:
+- **Email:** *"Do I have unread emails?"* · *"Send a PDF summary to Sarah."* · *"Archive all newsletters."*
+- **Calendar:** *"What's on my schedule tomorrow?"* · *"Block 2 hours for deep work."*
+- **Reminders:** *"Remind me about the dentist at 3 PM."* · *"What reminders do I have?"*
+- **Web Search:** *"What's the latest news on AI?"* · *"Current weather in London."*
+- **Finance:** *"Add a bill for electricity — ₹2,400 due March 20."* · *"Mark the internet bill as paid."*
+- **Memory:** *"Remember that my son's name is Vivaan."* · *"Who is in my family?"*
+- **Contacts:** *"Look up Sarah's email."* · *"Add John as a contact."*
 
-*   **Main Directory:** `~/.littlehive/`
-*   **Logs:** `~/.littlehive/logs/agent.log` (Check here if you ever need to troubleshoot)
-*   **Local Database:** `~/.littlehive/db/littlehive.db` (Contains your chat history, memory, and reminders)
-*   **Configuration & Auth:** `~/.littlehive/config/`
+### Chat Commands
+
+Type these directly in the chat window or Telegram:
+
+```
+/reset    Wipe context and start a fresh conversation
+/context  Show current token usage and context health
+/clear    Clear the chat window (UI only, keeps memory)
+/help     Show available commands
+```
+
+---
+
+## 📂 Data Storage
+
+Everything stays local:
+
+| Path | Contents |
+|------|----------|
+| `~/.littlehive/config/` | Configuration and Google OAuth tokens |
+| `~/.littlehive/db/littlehive.db` | Chat history, memories, reminders, cached emails |
+| `~/.littlehive/logs/agent.log` | Runtime logs for troubleshooting |
+
+---
+
+## 🔧 Development
+
+```bash
+git clone https://github.com/stackcv/littlehive.git
+cd littlehive
+pip install -e ".[dev]"
+ruff check src
+python -m build
+```
+
+### Releasing a New Version
+
+```bash
+./scripts/release.sh 0.7.0
+```
+
+This bumps version in `pyproject.toml` and `src/littlehive/__init__.py`, builds and validates the package, commits, tags, and pushes. GitHub Actions then publishes to PyPI and creates a GitHub Release automatically.
+
+---
+
+## 📄 License
+
+MIT

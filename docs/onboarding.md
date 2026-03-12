@@ -5,46 +5,37 @@
 pip install littlehive
 ```
 
-## Recommended Start
+## Setup
 ```bash
-lhive run
-# or: lh-run
+lhive setup
 ```
 
-On first run this launches onboarding and generates:
-- `config/instance.yaml` (no secrets)
-- `.env` (env var placeholders and saved token values you provide)
+The interactive wizard configures:
+1. **Identity** — Your name, assistant name, title, location
+2. **Google Workspace** — OAuth setup for Gmail, Calendar, Tasks (copies `credentials.json`, runs browser auth)
+3. **Telegram** — Bot token from @BotFather (optional)
+4. **Model** — Choose Ministral 8B (8 GB+ RAM) or 14B (16 GB+ RAM)
+5. **Do Not Disturb** — Hours when proactive notifications are suppressed
 
-Then it starts API, dashboard, and Telegram worker if enabled. Supervisor stays off by default.
+Config is saved to `~/.littlehive/config/config.json`.
 
-Use full onboarding prompts when needed:
+## Start
 ```bash
-lhive run --advanced
+lhive start
 ```
 
-To wipe local setup and start over:
+On first start, the AI model is downloaded from Hugging Face (~4–8 GB). A spinner shows progress. Once ready, the dashboard opens at http://localhost:8080.
+
+## Re-configure
 ```bash
-lhive reset
-# or: lh-reset
+lhive setup
 ```
 
-## Manual Generate Config
+Running setup again shows current values as defaults. Press Enter to keep, or type a new value.
+
+## Google Re-authentication
 ```bash
-littlehive-onboard
+lhive auth google
 ```
 
-Outputs:
-- `config/instance.yaml` (no secrets)
-- `.env` (env var placeholders)
-
-## Validate
-```bash
-littlehive-diag --validate-config --hardware --check-providers --recommend-models
-```
-
-## Start Services
-```bash
-littlehive-api --config config/instance.yaml
-littlehive-dashboard --config config/instance.yaml
-littlehive-telegram --config config/instance.yaml
-```
+Deletes the existing token and re-runs the OAuth browser flow.

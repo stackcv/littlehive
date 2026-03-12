@@ -1,0 +1,17 @@
+# Message Types
+MSG_TYPE_INIT = "init"
+MSG_TYPE_TOOL_START = "tool_start"
+MSG_TYPE_DONE = "done"
+MSG_TYPE_ERROR = "error"
+
+# Message Sources
+SOURCE_SYSTEM = "system"
+SOURCE_SYSTEM_MAINTENANCE = "system_maintenance"
+SOURCE_PROACTIVE = "proactive"
+SOURCE_WEB = "web"
+SOURCE_TELEGRAM = "telegram"
+
+# Commands
+CMD_SHUTDOWN = "shutdown"
+CMD_EXTRACT_MEMORIES = "EXTRACT_NIGHTLY_MEMORIES"
+CMD_MORNING_BRIEF = "GENERATE_MORNING_BRIEF"

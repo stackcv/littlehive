@@ -14,10 +14,10 @@ def get_calendar_service():
         return None
 
 
-def get_events(
-    time_min: str = None, time_max: str = None, max_results: int = 10
+def _live_get_events(
+    time_min: str = None, time_max: str = None, max_results: int = 100
 ) -> str:
-    """Fetch events within a timeframe. Returns IDs for updates/deletes."""
+    """Fetch events within a timeframe from Google API."""
     service = get_calendar_service()
     if not service:
         return json.dumps({"error": "Auth failed"})
@@ -42,13 +42,22 @@ def get_events(
                     "summary": e.get("summary", "No Title"),
                     "start": e["start"].get("dateTime", e["start"].get("date")),
                     "end": e["end"].get("dateTime", e["end"].get("date")),
+                    "description": e.get("description", ""),
                     "attendees": [a.get("email") for a in e.get("attendees", [])],
+                    "hangout_link": e.get("hangoutLink", "")
                 }
                 for e in events
             ]
         )
     except Exception as e:
         return json.dumps({"error": str(e)})
+
+def get_events(
+    time_min: str = None, time_max: str = None, max_results: int = 10
+) -> str:
+    """Fetch events from local cache."""
+    from littlehive.agent.local_cache import query_cached_events
+    return query_cached_events(time_min=time_min, time_max=time_max)
 
 
 def _actual_create_event(

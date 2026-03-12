@@ -21,7 +21,7 @@ def init_memory_db():
         CREATE TABLE IF NOT EXISTS core_memory (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             fact_text TEXT NOT NULL,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            timestamp DATETIME DEFAULT (datetime('now', 'localtime'))
         )
     """)
     # Archival memory for chat history (FTS5 for fast search)
@@ -138,43 +138,34 @@ def delete_core_fact(query: str) -> str:
 
 def search_past_conversations(query: str) -> str:
     """
-    Searches the archival chat history for past conversations.
-    Useful when the user asks about something discussed previously that is no longer in the immediate context.
+    Searches the archival chat history.
+    - If you provide a keyword, it searches message content.
+    - If you provide a date (YYYY-MM-DD), it retrieves messages from that day.
+    - If the query is "recent" or empty, it returns the 20 most recent messages.
     """
     conn = _get_db()
     cursor = conn.cursor()
-    # Ensure query is properly formatted for FTS5 (basic quoting)
-    # This escapes double quotes and wraps the query in double quotes to prevent syntax errors
-    safe_query = '"{}"'.format(query.replace('"', '""'))
+    import re
+    date_match = re.search(r"(\d{4}-\d{2}-\d{2})", query)
     try:
-        cursor.execute(
-            """
-            SELECT role, content, timestamp 
-            FROM chat_archive 
-            WHERE chat_archive MATCH ? 
-            ORDER BY rank 
-            LIMIT 10
-        """,
-            (safe_query,),
-        )
+        if date_match:
+            target_date = date_match.group(1)
+            cursor.execute("SELECT role, content, timestamp FROM chat_archive WHERE timestamp LIKE ? ORDER BY timestamp ASC", (f"{target_date}%",))
+        elif query.lower() in ("recent", ""):
+            cursor.execute("SELECT role, content, timestamp FROM chat_archive ORDER BY timestamp DESC LIMIT 20")
+        else:
+            safe_query = '"{}"'.format(query.replace('"', '""'))
+            cursor.execute("SELECT role, content, timestamp FROM chat_archive WHERE chat_archive MATCH ? ORDER BY rank LIMIT 20", (safe_query,))
         results = cursor.fetchall()
-    except sqlite3.OperationalError as e:
+    except Exception as e:
         conn.close()
-        return json.dumps({"error": f"Search failed: {str(e)}"})
-
+        return json.dumps({"error": str(e)})
     conn.close()
-
     if not results:
-        return json.dumps(
-            {"results": [], "message": "No relevant past conversations found."}
-        )
-
-    formatted_results = [
-        {"role": row["role"], "content": row["content"], "timestamp": row["timestamp"]}
-        for row in results
-    ]
-    return json.dumps({"results": formatted_results})
-
+        return json.dumps({"results": [], "message": f"No relevant conversations found for: '{query}'"})
+    formatted = [{"role": r["role"], "content": r["content"], "timestamp": r["timestamp"]} for r in results]
+    if query.lower() in ("recent", ""): formatted.reverse()
+    return json.dumps({"results": formatted})
 
 def get_all_core_facts() -> list:
     """Retrieves all core facts to be injected into the system prompt."""
@@ -187,18 +178,23 @@ def get_all_core_facts() -> list:
 
 
 def archive_messages(messages: list):
-    """Saves a list of compacted messages to the chat archive."""
+    """Saves a list of compacted messages to the chat archive, avoiding duplicates."""
     conn = _get_db()
     cursor = conn.cursor()
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     for msg in messages:
         role = msg.get("role", "unknown")
         content = msg.get("content", "")
-        # Only archive non-empty string content, don't archive tool calls JSON structure
         if isinstance(content, str) and content.strip():
+            # Check for existing to prevent duplicate entries
             cursor.execute(
-                "INSERT INTO chat_archive (role, content, timestamp) VALUES (?, ?, ?)",
-                (role, content, timestamp),
+                "SELECT count(*) FROM chat_archive WHERE role = ? AND content = ?",
+                (role, content),
             )
+            if cursor.fetchone()[0] == 0:
+                cursor.execute(
+                    "INSERT INTO chat_archive (role, content, timestamp) VALUES (?, ?, ?)",
+                    (role, content, timestamp),
+                )
     conn.commit()
     conn.close()

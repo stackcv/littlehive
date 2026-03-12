@@ -128,8 +128,33 @@ memory_route = Route(
     ],
 )
 
-# Add future routes here
-routes = [calendar_route, email_route, finance_route, reminder_route, memory_route]
+web_route = Route(
+    name="web",
+    utterances=[
+        "search the web",
+        "google this",
+        "look it up online",
+        "what is the latest news",
+        "what happened today in the world",
+        "current weather",
+        "latest car launches",
+        "search for information about",
+        "find out about",
+        "what is trending",
+        "news about",
+        "recent developments in",
+        "who won the match",
+        "live score",
+        "stock price of",
+        "what time is it in",
+        "convert currency",
+        "how much does",
+        "best restaurants near",
+        "flight status",
+    ],
+)
+
+routes = [calendar_route, email_route, finance_route, reminder_route, memory_route, web_route]
 
 # 2. Initialize the ultra-fast local embedding model
 logger.info(

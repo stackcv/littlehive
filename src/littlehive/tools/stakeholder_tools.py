@@ -1,7 +1,31 @@
 import sqlite3
 import json
+import random
 
 from littlehive.agent.paths import DB_PATH
+
+
+_FUN_FACTS = [
+    "Honey never spoils — archaeologists found 3,000-year-old honey in Egyptian tombs that was still edible.",
+    "Octopuses have three hearts and blue blood.",
+    "A group of flamingos is called a 'flamboyance'.",
+    "Bananas are berries, but strawberries aren't.",
+    "The shortest war in history lasted 38 minutes (Britain vs. Zanzibar, 1896).",
+    "Wombat droppings are cube-shaped.",
+    "Venus is the only planet that spins clockwise.",
+    "A jiffy is an actual unit of time — 1/100th of a second.",
+    "The inventor of the Pringles can is buried in one.",
+    "Sea otters hold hands while sleeping to keep from drifting apart.",
+    "The Eiffel Tower can be 15 cm taller during summer due to thermal expansion.",
+    "Scotland's national animal is the unicorn.",
+    "There are more possible iterations of a game of chess than atoms in the observable universe.",
+    "An astronaut's footprint on the Moon could last for 100 million years.",
+    "Cows have best friends and get stressed when separated.",
+]
+
+
+def pick_fun_fact() -> str:
+    return random.choice(_FUN_FACTS)
 
 
 def _init_db():
@@ -17,9 +41,15 @@ def _init_db():
             telegram TEXT,
             relationship TEXT,
             preferences TEXT,
-            date_added TEXT
+            date_added TEXT,
+            auto_respond INTEGER DEFAULT 0
         )
     """)
+    # Migrate existing tables that lack auto_respond
+    try:
+        c.execute("ALTER TABLE stakeholders ADD COLUMN auto_respond INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
     conn.commit()
     conn.close()
 
@@ -35,6 +65,7 @@ def add_stakeholder(
     telegram: str = "",
     relationship: str = "",
     preferences: str = "",
+    auto_respond: bool = False,
 ) -> str:
     """Add a new stakeholder/contact to the database."""
     try:
@@ -46,8 +77,8 @@ def add_stakeholder(
 
         c.execute(
             """
-            INSERT INTO stakeholders (name, alias, email, phone, telegram, relationship, preferences, date_added)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO stakeholders (name, alias, email, phone, telegram, relationship, preferences, date_added, auto_respond)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
             (
                 name,
@@ -58,6 +89,7 @@ def add_stakeholder(
                 relationship,
                 preferences,
                 date_added,
+                1 if auto_respond else 0,
             ),
         )
 
@@ -147,13 +179,13 @@ def update_stakeholder(
     telegram: str = None,
     relationship: str = None,
     preferences: str = None,
+    auto_respond: bool = None,
 ) -> str:
     """Update an existing stakeholder's details."""
     try:
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
 
-        # Check if exists
         c.execute("SELECT * FROM stakeholders WHERE id = ?", (stakeholder_id,))
         if not c.fetchone():
             conn.close()
@@ -185,6 +217,9 @@ def update_stakeholder(
         if preferences is not None:
             updates.append("preferences = ?")
             params.append(preferences)
+        if auto_respond is not None:
+            updates.append("auto_respond = ?")
+            params.append(1 if auto_respond else 0)
 
         if not updates:
             conn.close()
@@ -205,6 +240,22 @@ def update_stakeholder(
         )
     except Exception as e:
         return json.dumps({"error": str(e)})
+
+
+def get_auto_respond_contacts() -> list[dict]:
+    """Return stakeholders that have auto_respond enabled, with their email and preferences."""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        c.execute(
+            "SELECT id, name, alias, email, relationship, preferences FROM stakeholders WHERE auto_respond = 1 AND email IS NOT NULL AND email != ''"
+        )
+        rows = [dict(r) for r in c.fetchall()]
+        conn.close()
+        return rows
+    except Exception:
+        return []
 
 
 STAKEHOLDER_TOOLS_SCHEMA = [
@@ -237,6 +288,10 @@ STAKEHOLDER_TOOLS_SCHEMA = [
                     "preferences": {
                         "type": "string",
                         "description": "Specific instructions or context on how to deal with this person (e.g., 'Keep it short', 'Never schedule before 10 AM').",
+                    },
+                    "auto_respond": {
+                        "type": "boolean",
+                        "description": "Enable automatic draft-and-approve replies for emails from this person. Default false.",
                     },
                 },
                 "required": ["name"],
@@ -281,7 +336,7 @@ STAKEHOLDER_TOOLS_SCHEMA = [
         "type": "function",
         "function": {
             "name": "update_stakeholder",
-            "description": "Update an existing person/stakeholder in your relationship map. Use this to change their preferences, email, phone, or alias. You MUST use lookup_stakeholder first to get their exact stakeholder_id.",
+            "description": "Update an existing person/stakeholder in your relationship map. Use this to change their preferences, email, phone, alias, or auto-respond setting. You MUST use lookup_stakeholder first to get their exact stakeholder_id.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -316,6 +371,10 @@ STAKEHOLDER_TOOLS_SCHEMA = [
                     "preferences": {
                         "type": "string",
                         "description": "Specific instructions or context on how to deal with this person (optional).",
+                    },
+                    "auto_respond": {
+                        "type": "boolean",
+                        "description": "Enable or disable automatic draft-and-approve replies for this person (optional).",
                     },
                 },
                 "required": ["stakeholder_id"],

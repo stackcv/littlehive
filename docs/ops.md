@@ -1,50 +1,63 @@
-# Ops
+# Operations
 
-## Admin API
+## CLI Commands
 
-Default bind should remain localhost unless explicitly exposed.
-
-Key endpoints:
-- `GET /health`
-- `GET /status`
-- `GET /providers`
-- `GET /tasks`
-- `GET /tasks/{task_id}/trace`
-- `GET /memory/search`
-- `GET /users`
-- `GET /users/{user_id}/profile`
-- `PATCH /users/{user_id}/profile`
-- `GET /permissions/profile`
-- `PATCH /permissions/profile`
-- `GET /usage`
-- `GET /diagnostics/failures`
-- `GET /diagnostics/budgets`
-- `GET /confirmations`
-- `PATCH /confirmations/{id}`
-
-If `LITTLEHIVE_ADMIN_TOKEN` is set, mutation endpoints require `X-Admin-Token`.
+```
+lhive setup          Interactive setup wizard
+lhive start          Start agent (background process)
+lhive stop           Stop agent
+lhive restart        Restart agent
+lhive status         Show status and config summary
+lhive update         Check for and install PyPI updates
+lhive version        Show version
+lhive auth google    Re-run Google OAuth
+```
 
 ## Dashboard
 
-```bash
-littlehive-dashboard --config config/instance.yaml
+Default: http://localhost:8080 (opens automatically on start)
+
+### API Endpoints
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/health` | Health check + version |
+| GET | `/api/dashboard` | Stat counts (emails, reminders, bills) |
+| GET | `/api/context` | Current token usage and context stats |
+| GET | `/api/config` | Read configuration |
+| POST | `/api/config` | Update configuration |
+| POST | `/api/chat/send` | Send a chat message |
+| GET | `/api/chat/poll?cursor=N` | Long-poll for agent responses |
+| GET | `/api/memories` | List core memories |
+| PUT | `/api/memories/:id` | Edit a memory |
+| DELETE | `/api/memories/:id` | Delete a memory |
+| GET | `/api/contacts` | List contacts |
+| POST | `/api/contacts` | Add contact |
+| PUT | `/api/contacts/:id` | Update contact |
+| DELETE | `/api/contacts/:id` | Delete contact |
+| GET | `/api/tools` | List registered tools |
+
+## Logs
+
+```
+~/.littlehive/logs/agent.log
 ```
 
-Default host/port from config:
-- `dashboard_host`
-- `dashboard_port`
+## Database
 
-## Migrations
-```bash
-alembic upgrade head
-```
+SQLite at `~/.littlehive/db/littlehive.db`. Tables include:
+- `core_memory` — Long-term facts
+- `reminders` — Scheduled reminders
+- `bills` — Financial tracking
+- `stakeholders` — Contacts directory
+- `cached_emails` / `cached_events` — Local API cache
+- `pending_tasks` — Background task queue
+- `system_logs` — Structured logs
+- `conversation_archive` — Chat history for memory extraction
 
-Notes:
-- Migrations are now a clean single baseline snapshot (`0001_base_schema`).
-- Older phase-by-phase migration history has been intentionally removed during stabilization.
+## Telegram Authorization
 
-## Packaging
-```bash
-python -m build
-twine check dist/*
-```
+The bot uses a chat ID allowlist stored in `telegram_chat_id` config.
+- First `/start` from any user auto-registers if no IDs are configured.
+- After registration, only allowlisted chat IDs receive responses.
+- Multiple IDs supported via comma-separated values (e.g. `"123456,789012"`).

@@ -1,10 +1,28 @@
 import re
 import json
+import markdown
 from littlehive.agent.logger_setup import logger
 import base64
 from email.message import EmailMessage
 from googleapiclient.discovery import build
 from littlehive.tools.google_auth import get_credentials
+
+
+_EMAIL_CSS = (
+    "body { font-family: -apple-system, Helvetica, Arial, sans-serif; "
+    "font-size: 14px; line-height: 1.5; color: #222; } "
+    "p { margin: 0 0 10px; } "
+    "blockquote { border-left: 3px solid #ccc; padding-left: 12px; color: #555; }"
+)
+
+
+def _md_to_html(body: str) -> str:
+    """Convert a markdown email body to a styled HTML document."""
+    html_fragment = markdown.markdown(body, extensions=["extra", "nl2br"])
+    return (
+        f"<html><head><style>{_EMAIL_CSS}</style></head>"
+        f"<body>{html_fragment}</body></html>"
+    )
 
 
 def get_gmail_service():
@@ -17,7 +35,7 @@ def get_gmail_service():
         return None
 
 
-def search_emails(query: str = "is:unread", max_results: int = 10) -> str:
+def _live_search_emails(query: str = "is:unread", max_results: int = 10) -> str:
     """Search inbox using Gmail syntax. Returns high-level summaries."""
     service = get_gmail_service()
     if not service:
@@ -61,6 +79,9 @@ def search_emails(query: str = "is:unread", max_results: int = 10) -> str:
                 (h["value"] for h in headers if h["name"].lower() == "date"),
                 "Unknown Date",
             )
+            
+            # Extract internal date for cache ordering
+            internal_date = int(response.get("internalDate", "0"))
 
             # Check for one-click unsubscribe links
             unsubscribe_header = next(
@@ -76,6 +97,10 @@ def search_emails(query: str = "is:unread", max_results: int = 10) -> str:
                 match = re.search(r"<(https?://[^>]+)>", unsubscribe_header)
                 if match:
                     unsubscribe_link = match.group(1)
+            
+            # Determine if unread based on labels
+            label_ids = response.get("labelIds", [])
+            is_read = "UNREAD" not in label_ids
 
             email_info = {
                 "id": response["id"],
@@ -84,6 +109,8 @@ def search_emails(query: str = "is:unread", max_results: int = 10) -> str:
                 "subject": subject,
                 "date": date,
                 "snippet": response.get("snippet", ""),
+                "is_read": is_read,
+                "timestamp_ms": internal_date
             }
             if unsubscribe_link:
                 email_info["unsubscribe_link"] = unsubscribe_link
@@ -102,7 +129,7 @@ def search_emails(query: str = "is:unread", max_results: int = 10) -> str:
                     id=msg["id"],
                     format="metadata",
                     metadataHeaders=["From", "Subject", "Date", "List-Unsubscribe"],
-                    fields="id,threadId,snippet,payload/headers",
+                    fields="id,threadId,snippet,payload/headers,internalDate,labelIds",
                 )
             )
             batch.add(req)
@@ -112,6 +139,11 @@ def search_emails(query: str = "is:unread", max_results: int = 10) -> str:
         return json.dumps({"emails": email_list})
     except Exception as e:
         return json.dumps({"error": str(e)})
+
+def search_emails(query: str = "is:unread", max_results: int = 10) -> str:
+    """Search inbox using local cache."""
+    from littlehive.agent.local_cache import query_cached_emails
+    return query_cached_emails(query, max_results)
 
 
 def read_full_email(message_id: str) -> str:
@@ -161,6 +193,35 @@ def read_full_email(message_id: str) -> str:
         )
     except Exception as e:
         return json.dumps({"error": str(e)})
+
+
+def _update_email_cache_after_action(message_ids: list, action: str):
+    """Immediately reflect manage_email actions in the local cache so searches stay consistent."""
+    try:
+        from littlehive.agent.local_cache import _get_db
+        conn = _get_db()
+        cur = conn.cursor()
+        placeholders = ",".join("?" for _ in message_ids)
+
+        if action == "mark_read":
+            cur.execute(
+                f"UPDATE cached_emails SET is_read = 1 WHERE id IN ({placeholders})",
+                message_ids,
+            )
+        elif action == "mark_unread":
+            cur.execute(
+                f"UPDATE cached_emails SET is_read = 0 WHERE id IN ({placeholders})",
+                message_ids,
+            )
+        elif action in ("archive", "trash"):
+            cur.execute(
+                f"DELETE FROM cached_emails WHERE id IN ({placeholders})",
+                message_ids,
+            )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.warning(f"Cache update after {action} failed: {e}")
 
 
 def _actual_manage_email(message_id: str | list, action: str) -> str:
@@ -277,11 +338,12 @@ def _actual_manage_email(message_id: str | list, action: str) -> str:
             "removeLabelIds": remove_labels,
         }
 
-        # We can't batchModify a single ID (or rather, we don't have to, but batchModify handles 1 to 1000 IDs).
         if len(message_ids) > 0:
             service.users().messages().batchModify(userId="me", body=body).execute()
             for m_id in message_ids:
                 results.append({"id": m_id, "status": "success", "action": action})
+
+            _update_email_cache_after_action(message_ids, action)
 
         if len(results) == 1:
             return json.dumps(results[0])
@@ -331,6 +393,7 @@ def _actual_send_email(
             )
         else:
             message.set_content(body)
+            message.add_alternative(_md_to_html(body), subtype="html")
 
         message["To"] = to
         message["Subject"] = subject
@@ -345,7 +408,7 @@ def _actual_send_email(
             {
                 "status": "success",
                 "message_id": sent_message["id"],
-                "format": "pdf" if send_as_pdf else "text",
+                "format": "pdf" if send_as_pdf else "html",
             }
         )
     except Exception as e:
@@ -393,6 +456,7 @@ def _actual_reply_to_email(message_id: str, body: str) -> str:
 
         message = EmailMessage()
         message.set_content(body)
+        message.add_alternative(_md_to_html(body), subtype="html")
         message["To"] = orig_sender
         message["Subject"] = subject
         message["In-Reply-To"] = orig_msg_id
@@ -494,6 +558,7 @@ EMAIL_TOOLS_SCHEMA = [
                         "type": "string",
                         "description": "Email body content. ALWAYS use standard Markdown styling for formatting.",
                     },
+                    "next_run_at": {"type": "string", "description": "Optional: Schedule for later (YYYY-MM-DD HH:MM:SS format)"},
                     "send_as_pdf": {
                         "type": "boolean",
                         "description": "If true, converts the body from markdown into a formatted PDF attachment.",
@@ -530,11 +595,12 @@ EMAIL_TOOLS_SCHEMA = [
 from littlehive.tools.task_queue import queue_task
 
 
-def send_email(to: str, subject: str, body: str, send_as_pdf: bool = False) -> str:
+def send_email(to: str, subject: str, body: str, send_as_pdf: bool = False, next_run_at: str = None) -> str:
     """Compose and schedule an email to be sent asynchronously."""
     return queue_task(
         "send_email",
         {"to": to, "subject": subject, "body": body, "send_as_pdf": send_as_pdf},
+        next_run_at=next_run_at
     )
 
 
@@ -552,11 +618,11 @@ def execute_tool(name: str, args: dict) -> str:
     )
 
 
-def manage_email(message_id: str | list, action: str) -> str:
+def manage_email(message_id: str | list, action: str, next_run_at: str = None) -> str:
     """Queue an action on an email to be executed asynchronously."""
-    return queue_task("manage_email", {"message_id": message_id, "action": action})
+    return queue_task("manage_email", {"message_id": message_id, "action": action}, next_run_at=next_run_at)
 
 
-def reply_to_email(message_id: str, body: str) -> str:
+def reply_to_email(message_id: str, body: str, next_run_at: str = None) -> str:
     """Queue a reply to an email to be executed asynchronously."""
-    return queue_task("reply_to_email", {"message_id": message_id, "body": body})
+    return queue_task("reply_to_email", {"message_id": message_id, "body": body}, next_run_at=next_run_at)

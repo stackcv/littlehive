@@ -24,7 +24,7 @@ def init_queue_db():
             status TEXT DEFAULT 'queued',
             retry_count INTEGER DEFAULT 0,
             next_run_at DATETIME,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            created_at DATETIME DEFAULT (datetime('now', 'localtime')),
             error_message TEXT
         )
     """)
@@ -35,17 +35,19 @@ def init_queue_db():
 init_queue_db()
 
 
-def queue_task(tool_name: str, arguments: dict) -> str:
+def queue_task(tool_name: str, arguments: dict, next_run_at: str = None) -> str:
     """Inserts a task into the database queue for async execution."""
     conn = _get_db()
     cursor = conn.cursor()
-    now = datetime.now()
+    if next_run_at is None:
+        now = datetime.now()
+        next_run_at = now.strftime("%Y-%m-%d %H:%M:%S")
     cursor.execute(
         """
         INSERT INTO pending_tasks (tool_name, arguments, next_run_at) 
         VALUES (?, ?, ?)
     """,
-        (tool_name, json.dumps(arguments), now.strftime("%Y-%m-%d %H:%M:%S")),
+        (tool_name, json.dumps(arguments), next_run_at),
     )
     task_id = cursor.lastrowid
     conn.commit()
@@ -68,7 +70,7 @@ def check_task_status(query: str = None) -> str:
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT id, tool_name, status, retry_count, datetime(created_at, 'localtime') as created_at_local, error_message 
+        SELECT id, tool_name, status, retry_count, created_at, error_message 
         FROM pending_tasks 
         ORDER BY created_at DESC LIMIT 10
     """)
@@ -86,7 +88,7 @@ def check_task_status(query: str = None) -> str:
                 "tool": r["tool_name"],
                 "status": r["status"],
                 "retry_count": r["retry_count"],
-                "created_at": r["created_at_local"],
+                "created_at": r["created_at"],
                 "error_message": r["error_message"],
             }
         )

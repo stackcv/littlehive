@@ -19,7 +19,10 @@ dependencies = [
   "mlx-lm",
   "apscheduler",
   "semantic-router",
-  "requests"
+  "requests",
+  "markdown",
+  "xhtml2pdf",
+  "ddgs",
 ]
 
 [project.optional-dependencies]

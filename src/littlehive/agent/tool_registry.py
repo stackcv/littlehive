@@ -23,8 +23,18 @@ from littlehive.tools.stakeholder_tools import (
     execute_tool as stakeholder_execute,
 )
 from littlehive.tools.task_queue import QUEUE_TOOLS_SCHEMA, execute_queue_tool
-
-
+from littlehive.tools.messaging_tools import (
+    MESSAGING_TOOLS_SCHEMA,
+    execute_tool as messaging_execute,
+)
+from littlehive.tools.google_tasks import (
+    TASKS_TOOLS_SCHEMA,
+    execute_tool as tasks_execute,
+)
+from littlehive.tools.web_tools import (
+    WEB_TOOLS_SCHEMA,
+    execute_tool as web_execute,
+)
 from littlehive.tools.memory_tools import (
     save_core_fact,
     search_past_conversations,
@@ -36,7 +46,7 @@ MEMORY_TOOLS_SCHEMA = [
         "type": "function",
         "function": {
             "name": "save_core_fact",
-            "description": "Saves an important fact about the user or their life into core memory. These facts are guaranteed to be remembered in all future conversations. Use this immediately when the user tells you a fact about themselves, their life, or their preferences.",
+            "description": "Saves an important long-term fact into core memory. Only use when the user EXPLICITLY tells you something personal (name, family, birthday, preference) that should be remembered permanently. Do NOT save transient topics, task details, or conversational context.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -100,9 +110,6 @@ def memory_execute(tool_name: str, args: Dict[str, Any]) -> str:
         return json.dumps({"error": str(e)})
 
 
-# --- The Tiered Persona Tool Bundles ---
-# The core Executive Assistant persona requires Email, Calendar, and Finance
-# simultaneously to handle cross-domain tasks without hallucinating.
 EA_PERSONA_TOOLS = (
     EMAIL_TOOLS_SCHEMA
     + CALENDAR_TOOLS_SCHEMA
@@ -110,34 +117,39 @@ EA_PERSONA_TOOLS = (
     + REMINDER_TOOLS_SCHEMA
     + STAKEHOLDER_TOOLS_SCHEMA
     + MEMORY_TOOLS_SCHEMA
+    + MESSAGING_TOOLS_SCHEMA
     + QUEUE_TOOLS_SCHEMA
+    + TASKS_TOOLS_SCHEMA
+    + WEB_TOOLS_SCHEMA
 )
 
-# Map string route names to their respective personas.
 ROUTE_SCHEMAS = {
     "calendar": EA_PERSONA_TOOLS,
     "email": EA_PERSONA_TOOLS,
     "finance": EA_PERSONA_TOOLS,
     "reminder": EA_PERSONA_TOOLS,
     "memory": EA_PERSONA_TOOLS,
-    # Add future personas here:
-    # "developer": DEV_PERSONA_TOOLS,
+    "tasks": EA_PERSONA_TOOLS,
+    "web": EA_PERSONA_TOOLS,
 }
 
 
 def get_all_schemas() -> List[Dict[str, Any]]:
-    """Returns all available schemas across all routes."""
+    """Returns all available schemas across all routes without duplicates."""
     all_tools = []
+    seen_names = set()
     for schemas in ROUTE_SCHEMAS.values():
-        all_tools.extend(schemas)
+        for schema in schemas:
+            name = schema["function"]["name"]
+            if name not in seen_names:
+                seen_names.add(name)
+                all_tools.append(schema)
     return all_tools
 
 
 def dispatch_tool(tool_name: str, tool_args: Dict[str, Any]) -> str:
     """
     Global executor that checks all tools and runs the correct one.
-    This ensures that even if the LLM hallucinates a tool from a different route,
-    we can still attempt to execute it if it exists.
     """
     # 1. Calendar tools
     calendar_tool_names = [t["function"]["name"] for t in CALENDAR_TOOLS_SCHEMA]
@@ -173,5 +185,20 @@ def dispatch_tool(tool_name: str, tool_args: Dict[str, Any]) -> str:
     queue_tool_names = [t["function"]["name"] for t in QUEUE_TOOLS_SCHEMA]
     if tool_name in queue_tool_names:
         return execute_queue_tool(tool_name, tool_args)
+
+    # 8. Messaging tools
+    messaging_tool_names = [t["function"]["name"] for t in MESSAGING_TOOLS_SCHEMA]
+    if tool_name in messaging_tool_names:
+        return messaging_execute(tool_name, tool_args)
+
+    # 9. Google Tasks tools
+    tasks_tool_names = [t["function"]["name"] for t in TASKS_TOOLS_SCHEMA]
+    if tool_name in tasks_tool_names:
+        return tasks_execute(tool_name, tool_args)
+
+    # 10. Web search tools
+    web_tool_names = [t["function"]["name"] for t in WEB_TOOLS_SCHEMA]
+    if tool_name in web_tool_names:
+        return web_execute(tool_name, tool_args)
 
     return json.dumps({"error": f"Tool '{tool_name}' not found in registry."})

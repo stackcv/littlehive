@@ -16,7 +16,7 @@ on:
           - testpypi
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 concurrency:
@@ -86,6 +86,49 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+
+  github-release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: publish-pypi
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          PREV_TAG=$(git tag --sort=-v:refname | grep '^v' | sed -n '2p')
+          if [ -z "$PREV_TAG" ]; then
+            echo "body=Initial release." >> "$GITHUB_OUTPUT"
+          else
+            LOG=$(git log --oneline "${PREV_TAG}..HEAD" --no-merges | head -30)
+            {
+              echo "body<<EONOTES"
+              echo "## Changes since ${PREV_TAG}"
+              echo ""
+              echo "${LOG}"
+              echo ""
+              echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${{ github.ref_name }}"
+              echo "EONOTES"
+            } >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body: ${{ steps.notes.outputs.body }}
+          files: dist/*
+          generate_release_notes: false
 
   publish-testpypi:
     if: github.event_name == 'workflow_dispatch' && inputs.repository == 'testpypi'

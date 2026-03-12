@@ -32,11 +32,16 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
     outbox = None
 
     def log_message(self, format, *args):
-        # Suppress logging to keep the console clean
         pass
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=DASHBOARD_DIR, **kwargs)
+
+    def handle(self):
+        try:
+            super().handle()
+        except BrokenPipeError:
+            pass
 
     def end_headers(self):
         if self.path.startswith("/api/"):
@@ -47,10 +52,6 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/api/dashboard":
-            self.send_response(200)
-            self.send_header("Content-type", "application/json")
-            self.end_headers()
-
             try:
                 conn = sqlite3.connect(DB_PATH)
                 conn.row_factory = dict_factory
@@ -94,51 +95,95 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
                 except Exception:
                     pass
 
-                self.wfile.write(
-                    json.dumps(
-                        {
-                            "bills": bills,
-                            "reminders": reminders,
-                            "emails": unread_emails,
-                        }
-                    ).encode()
-                )
+                response_data = json.dumps(
+                    {
+                        "bills": bills,
+                        "reminders": reminders,
+                        "emails": unread_emails,
+                    }
+                ).encode("utf-8")
             except Exception as e:
-                self.wfile.write(
-                    json.dumps(
-                        {"error": str(e), "bills": [], "reminders": [], "emails": []}
-                    ).encode()
-                )
+                response_data = json.dumps(
+                    {"error": str(e), "bills": [], "reminders": [], "emails": []}
+                ).encode("utf-8")
+            
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.send_header("Content-Length", str(len(response_data)))
+            self.end_headers()
+            self.wfile.write(response_data)
+            return
+
+        elif self.path == "/api/context":
+            from littlehive.agent.queues import context_stats
+            response_data = json.dumps(context_stats).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.send_header("Content-Length", str(len(response_data)))
+            self.end_headers()
+            self.wfile.write(response_data)
             return
 
         elif self.path == "/api/health":
+            from littlehive import __version__
+            response_data = json.dumps({"status": "ok", "version": __version__}).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-type", "application/json")
+            self.send_header("Content-Length", str(len(response_data)))
             self.end_headers()
-            self.wfile.write(json.dumps({"status": "ok"}).encode())
+            self.wfile.write(response_data)
             return
 
-        elif self.path == "/api/chat/poll":
+        elif self.path.startswith("/api/chat/poll"):
+            if not hasattr(DashboardHandler, "chat_history"):
+                DashboardHandler.chat_history = []
+                
+            # Parse cursor from query params
+            from urllib.parse import urlparse, parse_qs
+            parsed_path = urlparse(self.path)
+            query_params = parse_qs(parsed_path.query)
+            try:
+                client_cursor = int(query_params.get('cursor', ['0'])[0])
+            except ValueError:
+                client_cursor = 0
+
+            # If the client is fully caught up, WAIT for a new message (Long Polling)
+            if client_cursor >= len(DashboardHandler.chat_history) and self.outbox:
+                try:
+                    # Block for up to 30 seconds waiting for the agent to say something
+                    msg = self.outbox.get(timeout=30)
+                    DashboardHandler.chat_history.append(msg)
+                except queue.Empty:
+                    pass # Timeout reached, we will just return an empty array
+
+            # Drain any remaining messages in the queue that might have arrived at the exact same time
+            if self.outbox:
+                while not self.outbox.empty():
+                    try:
+                        msg = self.outbox.get_nowait()
+                        DashboardHandler.chat_history.append(msg)
+                    except queue.Empty:
+                        break
+
+            # Return new messages
+            if client_cursor < len(DashboardHandler.chat_history):
+                new_msgs = DashboardHandler.chat_history[client_cursor:]
+            else:
+                new_msgs = []
+                
+            response_data = json.dumps({
+                "messages": new_msgs, 
+                "next_cursor": len(DashboardHandler.chat_history)
+            }).encode("utf-8")
+            
             self.send_response(200)
             self.send_header("Content-type", "application/json")
+            self.send_header("Content-Length", str(len(response_data)))
             self.end_headers()
-            if self.outbox:
-                try:
-                    # Wait up to 30 seconds for a new message
-                    msg = self.outbox.get(timeout=30)
-                    self.wfile.write(json.dumps(msg).encode())
-                except queue.Empty:
-                    # Return empty response to let client reconnect
-                    self.wfile.write(json.dumps({}).encode())
-            else:
-                self.wfile.write(json.dumps({"error": "No outbox queue"}).encode())
+            self.wfile.write(response_data)
             return
 
         elif self.path == "/api/memories":
-            self.send_response(200)
-            self.send_header("Content-type", "application/json")
-            self.end_headers()
-
             try:
                 conn = sqlite3.connect(DB_PATH)
                 conn.row_factory = dict_factory
@@ -156,16 +201,18 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
                     memories = []
 
                 conn.close()
-                self.wfile.write(json.dumps({"memories": memories}).encode())
+                response_data = json.dumps({"memories": memories}).encode("utf-8")
             except Exception as e:
-                self.wfile.write(json.dumps({"error": str(e), "memories": []}).encode())
+                response_data = json.dumps({"error": str(e), "memories": []}).encode("utf-8")
+
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.send_header("Content-Length", str(len(response_data)))
+            self.end_headers()
+            self.wfile.write(response_data)
             return
 
         elif self.path == "/api/contacts":
-            self.send_response(200)
-            self.send_header("Content-type", "application/json")
-            self.end_headers()
-
             try:
                 conn = sqlite3.connect(DB_PATH)
                 conn.row_factory = dict_factory
@@ -181,16 +228,18 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
                     contacts = []
 
                 conn.close()
-                self.wfile.write(json.dumps(contacts).encode())
+                response_data = json.dumps(contacts).encode("utf-8")
             except Exception as e:
-                self.wfile.write(json.dumps({"error": str(e)}).encode())
+                response_data = json.dumps({"error": str(e)}).encode("utf-8")
+            
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.send_header("Content-Length", str(len(response_data)))
+            self.end_headers()
+            self.wfile.write(response_data)
             return
 
         elif self.path == "/api/tools":
-            self.send_response(200)
-            self.send_header("Content-type", "application/json")
-            self.end_headers()
-
             try:
 
                 from littlehive.agent.tool_registry import ROUTE_SCHEMAS
@@ -206,16 +255,18 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
                             }
                         )
 
-                self.wfile.write(json.dumps(tools_list).encode())
+                response_data = json.dumps(tools_list).encode("utf-8")
             except Exception as e:
-                self.wfile.write(json.dumps({"error": str(e)}).encode())
+                response_data = json.dumps({"error": str(e)}).encode("utf-8")
+            
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.send_header("Content-Length", str(len(response_data)))
+            self.end_headers()
+            self.wfile.write(response_data)
             return
 
         elif self.path == "/api/config":
-            self.send_response(200)
-            self.send_header("Content-type", "application/json")
-            self.end_headers()
-
             try:
                 with open(CONFIG_PATH, "r") as f:
                     config = json.load(f)
@@ -223,9 +274,15 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
                 # Check for google auth token
                 config["has_google_auth"] = os.path.exists(TOKEN_PATH)
 
-                self.wfile.write(json.dumps(config).encode())
+                response_data = json.dumps(config).encode("utf-8")
             except Exception as e:
-                self.wfile.write(json.dumps({"error": str(e)}).encode())
+                response_data = json.dumps({"error": str(e)}).encode("utf-8")
+            
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.send_header("Content-Length", str(len(response_data)))
+            self.end_headers()
+            self.wfile.write(response_data)
             return
 
         return super().do_GET()
@@ -238,21 +295,35 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
             try:
                 data = json.loads(post_data.decode("utf-8"))
                 user_msg = data.get("message", "")
+                attachment = data.get("attachment", None)
 
                 if self.inbox and user_msg.strip():
-                    self.inbox.put({"source": "web", "text": user_msg})
+                    if not hasattr(DashboardHandler, "chat_history"):
+                        DashboardHandler.chat_history = []
+                    DashboardHandler.chat_history.append(
+                        {"type": "user", "content": user_msg}
+                    )
 
+                    task_payload = {"source": "web", "text": user_msg}
+                    if attachment:
+                        task_payload["attachment"] = attachment
+                    self.inbox.put(task_payload)
+
+                response_data = json.dumps({"success": True}).encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-type", "application/json")
+                self.send_header("Content-Length", str(len(response_data)))
                 self.end_headers()
-                self.wfile.write(json.dumps({"success": True}).encode())
+                self.wfile.write(response_data)
             except Exception as e:
+                response_data = json.dumps({"error": str(e)}).encode("utf-8")
                 self.send_response(500)
                 self.send_header("Content-type", "application/json")
+                self.send_header("Content-Length", str(len(response_data)))
                 self.end_headers()
-                self.wfile.write(json.dumps({"error": str(e)}).encode())
+                self.wfile.write(response_data)
             return
-
+            
         elif self.path == "/api/contacts":
             content_length = int(self.headers["Content-Length"])
             post_data = self.rfile.read(content_length)
@@ -268,16 +339,21 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
                     telegram=data.get("telegram", ""),
                     relationship=data.get("relationship", ""),
                     preferences=data.get("preferences", ""),
+                    auto_respond=bool(data.get("auto_respond", False)),
                 )
+                response_data = res.encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-type", "application/json")
+                self.send_header("Content-Length", str(len(response_data)))
                 self.end_headers()
-                self.wfile.write(res.encode("utf-8"))
+                self.wfile.write(response_data)
             except Exception as e:
+                response_data = json.dumps({"error": str(e)}).encode("utf-8")
                 self.send_response(500)
                 self.send_header("Content-type", "application/json")
+                self.send_header("Content-Length", str(len(response_data)))
                 self.end_headers()
-                self.wfile.write(json.dumps({"error": str(e)}).encode())
+                self.wfile.write(response_data)
             return
 
         elif self.path == "/api/config":
@@ -297,19 +373,56 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
                 with open(CONFIG_PATH, "w") as f:
                     json.dump(config, f, indent=4)
 
+                response_data = json.dumps({"success": True}).encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-type", "application/json")
+                self.send_header("Content-Length", str(len(response_data)))
                 self.end_headers()
-                self.wfile.write(json.dumps({"success": True}).encode())
+                self.wfile.write(response_data)
             except Exception as e:
+                response_data = json.dumps({"error": str(e)}).encode("utf-8")
                 self.send_response(500)
                 self.send_header("Content-type", "application/json")
+                self.send_header("Content-Length", str(len(response_data)))
                 self.end_headers()
-                self.wfile.write(json.dumps({"error": str(e)}).encode())
+                self.wfile.write(response_data)
             return
 
     def do_PUT(self):
+
+        if self.path.startswith("/api/memories/"):
+            try:
+                memory_id = int(self.path.split("/")[-1])
+                content_length = int(self.headers["Content-Length"])
+                post_data = self.rfile.read(content_length)
+                data = json.loads(post_data.decode("utf-8"))
+                new_fact = data.get("fact_text", "")
+                
+                conn = sqlite3.connect(DB_PATH)
+                cursor = conn.cursor()
+                cursor.execute("UPDATE core_memory SET fact_text = ? WHERE id = ?", (new_fact, memory_id))
+                conn.commit()
+                conn.close()
+                
+                response_data = json.dumps({"success": True}).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-type", "application/json")
+                self.send_header("Content-Length", str(len(response_data)))
+                self.end_headers()
+                self.wfile.write(response_data)
+            except Exception as e:
+                response_data = json.dumps({"error": str(e)}).encode("utf-8")
+                self.send_response(500)
+                self.send_header("Content-type", "application/json")
+                self.send_header("Content-Length", str(len(response_data)))
+                self.end_headers()
+                self.wfile.write(response_data)
+            return
+
+
         if self.path.startswith("/api/contacts/"):
+
+
             try:
                 stakeholder_id = int(self.path.split("/")[-1])
                 content_length = int(self.headers["Content-Length"])
@@ -317,6 +430,10 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
                 data = json.loads(post_data.decode("utf-8"))
 
                 from littlehive.tools.stakeholder_tools import update_stakeholder
+
+                auto_respond_val = data.get("auto_respond")
+                if auto_respond_val is not None:
+                    auto_respond_val = bool(auto_respond_val)
 
                 res = update_stakeholder(
                     stakeholder_id=stakeholder_id,
@@ -327,37 +444,70 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
                     telegram=data.get("telegram"),
                     relationship=data.get("relationship"),
                     preferences=data.get("preferences"),
+                    auto_respond=auto_respond_val,
                 )
+                response_data = res.encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-type", "application/json")
+                self.send_header("Content-Length", str(len(response_data)))
                 self.end_headers()
-                self.wfile.write(res.encode("utf-8"))
+                self.wfile.write(response_data)
             except Exception as e:
+                response_data = json.dumps({"error": str(e)}).encode("utf-8")
                 self.send_response(500)
                 self.send_header("Content-type", "application/json")
+                self.send_header("Content-Length", str(len(response_data)))
                 self.end_headers()
-                self.wfile.write(json.dumps({"error": str(e)}).encode())
+                self.wfile.write(response_data)
             return
 
         self.send_response(404)
         self.end_headers()
 
     def do_DELETE(self):
+        if self.path.startswith("/api/memories/"):
+            try:
+                memory_id = int(self.path.split("/")[-1])
+                conn = sqlite3.connect(DB_PATH)
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM core_memory WHERE id = ?", (memory_id,))
+                conn.commit()
+                conn.close()
+
+                response_data = json.dumps({"success": True}).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-type", "application/json")
+                self.send_header("Content-Length", str(len(response_data)))
+                self.end_headers()
+                self.wfile.write(response_data)
+            except Exception as e:
+                response_data = json.dumps({"error": str(e)}).encode("utf-8")
+                self.send_response(500)
+                self.send_header("Content-type", "application/json")
+                self.send_header("Content-Length", str(len(response_data)))
+                self.end_headers()
+                self.wfile.write(response_data)
+            return
+
         if self.path.startswith("/api/contacts/"):
             try:
                 stakeholder_id = int(self.path.split("/")[-1])
                 from littlehive.tools.stakeholder_tools import remove_stakeholder
 
                 res = remove_stakeholder(stakeholder_id)
+                response_data = res.encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-type", "application/json")
+                self.send_header("Content-Length", str(len(response_data)))
                 self.end_headers()
-                self.wfile.write(res.encode("utf-8"))
+                self.wfile.write(response_data)
             except Exception as e:
+                response_data = json.dumps({"error": str(e)}).encode("utf-8")
                 self.send_response(500)
                 self.send_header("Content-type", "application/json")
+                self.send_header("Content-Length", str(len(response_data)))
                 self.end_headers()
-                self.wfile.write(json.dumps({"error": str(e)}).encode())
+                self.wfile.write(response_data)
             return
 
         self.send_response(404)
