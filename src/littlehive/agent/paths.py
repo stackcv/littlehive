@@ -15,3 +15,9 @@ CREDENTIALS_PATH = os.path.join(CONFIG_DIR, "credentials.json")
 def ensure_paths():
     os.makedirs(DB_DIR, exist_ok=True)
     os.makedirs(CONFIG_DIR, exist_ok=True)
+    os.makedirs(os.path.join(LITTLEHIVE_DIR, "logs"), exist_ok=True)
+
+
+# Create directories immediately on import so all modules
+# that reference DB_PATH, CONFIG_PATH, etc. work on fresh installs.
+ensure_paths()
