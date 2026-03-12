@@ -43,5 +43,9 @@ include-package-data = true
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+"littlehive.agent" = ["*.md", "prompts/*.md"]
+"littlehive.dashboard" = ["*.html", "*.css", "*.js"]
+
 [tool.ruff.lint]
 ignore = ["E402"]

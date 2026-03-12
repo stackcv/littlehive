@@ -1,1 +1,3 @@
 recursive-include src/littlehive/dashboard *.html *.css *.js
+recursive-include src/littlehive/agent *.md
+recursive-include src/littlehive/agent/prompts *.md
