@@ -17,8 +17,7 @@ from littlehive.agent.scheduler import start_proactive_scheduler
 from littlehive.agent.queues import inbox_queue, outbox_telegram, outbox_web, MultiOutbox, context_stats
 from littlehive.agent.constants import (
     MSG_TYPE_INIT, MSG_TYPE_TOOL_START, MSG_TYPE_DONE, MSG_TYPE_ERROR,
-    SOURCE_TELEGRAM, SOURCE_WEB, SOURCE_SYSTEM, SOURCE_SYSTEM_MAINTENANCE, SOURCE_PROACTIVE,
-    CMD_SHUTDOWN, CMD_EXTRACT_MEMORIES, CMD_MORNING_BRIEF
+    SOURCE_TELEGRAM, SOURCE_WEB, SOURCE_SYSTEM, SOURCE_SYSTEM_MAINTENANCE, CMD_SHUTDOWN, CMD_EXTRACT_MEMORIES, CMD_MORNING_BRIEF
 )
 
 
@@ -358,7 +357,7 @@ def main():
                         t = _friendly_time(e.get("start", ""))
                         evt_lines.append(f"  - {summary} at {t}")
                     if evt_lines:
-                        parts.append(f"**Upcoming today:**\n" + "\n".join(evt_lines[:5]))
+                        parts.append("**Upcoming today:**\n" + "\n".join(evt_lines[:5]))
 
                 from littlehive.tools.reminder_tools import get_pending_reminders
                 rem_str = get_pending_reminders()

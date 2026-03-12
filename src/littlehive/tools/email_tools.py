@@ -363,22 +363,39 @@ def _actual_send_email(
         message = EmailMessage()
 
         if send_as_pdf:
-            # The email body becomes a simple cover letter
             message.set_content("Please find the requested document attached.")
 
-            # Convert the Markdown body to PDF using xhtml2pdf
-            import markdown
-            from xhtml2pdf import pisa
+            from fpdf import FPDF
             import io
 
-            # Convert markdown to HTML with 'extra' features (tables, etc.)
-            html_text = markdown.markdown(body, extensions=["extra"])
+            pdf = FPDF()
+            pdf.set_auto_page_break(auto=True, margin=20)
+            pdf.add_page()
+            pdf.set_font("Helvetica", size=11)
 
-            # Wrap in basic CSS for professional formatting
-            styled_html = f"<html><head><style>body {{ font-family: Helvetica, sans-serif; padding: 30px; font-size: 12pt; line-height: 1.6; color: #333; }} h1, h2, h3 {{ color: #000; border-bottom: 1px solid #eee; padding-bottom: 10px; }} code {{ background: #f4f4f4; padding: 2px 4px; border-radius: 3px; }} pre {{ background: #f4f4f4; padding: 10px; border-radius: 5px; }} blockquote {{ border-left: 5px solid #ccc; padding-left: 15px; color: #666; }}</style></head><body>{html_text}</body></html>"
+            for line in body.split("\n"):
+                stripped = line.strip()
+                if stripped.startswith("# "):
+                    pdf.set_font("Helvetica", "B", 16)
+                    pdf.cell(0, 10, stripped[2:], new_x="LMARGIN", new_y="NEXT")
+                    pdf.set_font("Helvetica", size=11)
+                elif stripped.startswith("## "):
+                    pdf.set_font("Helvetica", "B", 14)
+                    pdf.cell(0, 9, stripped[3:], new_x="LMARGIN", new_y="NEXT")
+                    pdf.set_font("Helvetica", size=11)
+                elif stripped.startswith("### "):
+                    pdf.set_font("Helvetica", "B", 12)
+                    pdf.cell(0, 8, stripped[4:], new_x="LMARGIN", new_y="NEXT")
+                    pdf.set_font("Helvetica", size=11)
+                elif stripped.startswith("- ") or stripped.startswith("* "):
+                    pdf.multi_cell(0, 6, f"   - {stripped[2:]}", new_x="LMARGIN", new_y="NEXT")
+                elif stripped == "":
+                    pdf.ln(4)
+                else:
+                    pdf.multi_cell(0, 6, stripped, new_x="LMARGIN", new_y="NEXT")
 
             pdf_buffer = io.BytesIO()
-            pisa.CreatePDF(io.StringIO(styled_html), dest=pdf_buffer)
+            pdf.output(pdf_buffer)
             pdf_data = pdf_buffer.getvalue()
 
             # Attach the PDF

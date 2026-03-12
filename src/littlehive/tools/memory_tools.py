@@ -164,7 +164,8 @@ def search_past_conversations(query: str) -> str:
     if not results:
         return json.dumps({"results": [], "message": f"No relevant conversations found for: '{query}'"})
     formatted = [{"role": r["role"], "content": r["content"], "timestamp": r["timestamp"]} for r in results]
-    if query.lower() in ("recent", ""): formatted.reverse()
+    if query.lower() in ("recent", ""):
+        formatted.reverse()
     return json.dumps({"results": formatted})
 
 def get_all_core_facts() -> list:

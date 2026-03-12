@@ -1,11 +1,9 @@
 import sqlite3
 import json
-import logging
 from datetime import datetime, timedelta, timezone
 import os
 
 from littlehive.agent.paths import DB_PATH
-from littlehive.agent.logger_setup import logger
 
 def _get_db():
     conn = sqlite3.connect(DB_PATH)

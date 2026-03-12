@@ -55,7 +55,7 @@ def _actual_send_channel_message(channel: str, recipient: str, message: str) -> 
             with urllib.request.urlopen(req) as response:
                 result = json.loads(response.read().decode())
                 if result.get("ok"):
-                    return json.dumps({"status": "success", "message": f"Message sent via Telegram."})
+                    return json.dumps({"status": "success", "message": "Message sent via Telegram."})
                 else:
                     return json.dumps({"error": f"Telegram API error: {result.get('description')}"})
         except Exception as e:

@@ -21,7 +21,7 @@ dependencies = [
   "semantic-router",
   "requests",
   "markdown",
-  "xhtml2pdf",
+  "fpdf2",
   "ddgs",
 ]
 

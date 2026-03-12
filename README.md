@@ -120,26 +120,6 @@ Everything stays local:
 
 ---
 
-## 🔧 Development
-
-```bash
-git clone https://github.com/stackcv/littlehive.git
-cd littlehive
-pip install -e ".[dev]"
-ruff check src
-python -m build
-```
-
-### Releasing a New Version
-
-```bash
-./scripts/release.sh 0.7.0
-```
-
-This bumps version in `pyproject.toml` and `src/littlehive/__init__.py`, builds and validates the package, commits, tags, and pushes. GitHub Actions then publishes to PyPI and creates a GitHub Release automatically.
-
----
-
 ## 📄 License
 
 MIT

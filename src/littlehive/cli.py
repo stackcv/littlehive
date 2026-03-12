@@ -169,7 +169,7 @@ def setup():
         print(f"    {m['key']}. {m['name']}  ({m['ram']} RAM){marker}")
     print()
 
-    model_choice = input(f"  Selection [keep current]: ").strip()
+    model_choice = input("  Selection [keep current]: ").strip()
     if model_choice in [m["key"] for m in AVAILABLE_MODELS]:
         selected = next(m for m in AVAILABLE_MODELS if m["key"] == model_choice)
         save_config_value("model_path", selected["path"])
@@ -181,7 +181,7 @@ def setup():
     print()
     dnd_start = config.get("dnd_start", DEFAULT_CONFIG["dnd_start"])
     dnd_end = config.get("dnd_end", DEFAULT_CONFIG["dnd_end"])
-    print(f"  Do Not Disturb hours (agent won't send proactive notifications):")
+    print("  Do Not Disturb hours (agent won't send proactive notifications):")
     dnd_start_input = input(f"  DnD start hour (0-23) [{dnd_start}]: ").strip()
     dnd_end_input = input(f"  DnD end hour (0-23) [{dnd_end}]: ").strip()
 
@@ -277,7 +277,7 @@ def status():
     )
     print(f"  Model:      {model_name}")
     print(f"  DnD:        {config.get('dnd_start', 23)}:00 - {config.get('dnd_end', 7)}:00")
-    print(f"  Dashboard:  http://localhost:8080")
+    print("  Dashboard:  http://localhost:8080")
     print(f"  Logs:       {LOG_FILE}")
     print()
 

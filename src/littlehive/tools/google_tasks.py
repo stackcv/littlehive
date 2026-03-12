@@ -83,8 +83,10 @@ def _actual_create_task(title: str, notes: str = None, due: str = None, tasklist
         return json.dumps({"error": "Auth failed"})
     try:
         task = {"title": title}
-        if notes: task["notes"] = notes
-        if due: task["due"] = due
+        if notes:
+            task["notes"] = notes
+        if due:
+            task["due"] = due
         
         result = service.tasks().insert(tasklist=tasklist_id, body=task).execute()
         return json.dumps({"status": "success", "id": result.get("id")})

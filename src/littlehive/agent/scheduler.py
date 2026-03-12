@@ -116,7 +116,7 @@ def check_apis_job():
             
             # Check for new unread emails for proactive notification
             for email in emails:
-                if email["is_read"] == False and email["id"] not in notified_email_ids:
+                if not email["is_read"] and email["id"] not in notified_email_ids:
                     notified_email_ids.add(email["id"])
                     updates.append(
                         f"📧 New Email (ID: {email['id']}): '{email['subject']}' from {email['sender']}"
@@ -445,8 +445,6 @@ def start_proactive_scheduler(inbox, outbox_web, outbox_telegram, get_active_cha
     """Wire up queue references and start the background scheduler."""
     global _inbox, _outbox_web, _outbox_telegram, _get_active_chat_id
     global notified_email_ids, notified_event_ids
-    from littlehive.tools.email_tools import search_emails
-    from littlehive.tools.calendar_tools import get_events
 
     _inbox = inbox
     _outbox_web = outbox_web
