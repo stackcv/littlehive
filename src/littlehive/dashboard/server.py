@@ -278,18 +278,16 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path == "/api/tools":
             try:
 
-                from littlehive.agent.tool_registry import ROUTE_SCHEMAS
+                from littlehive.agent.tool_registry import get_all_schemas
 
                 tools_list = []
-                for route, schemas in ROUTE_SCHEMAS.items():
-                    for schema in schemas:
-                        tools_list.append(
-                            {
-                                "name": schema["function"]["name"],
-                                "description": schema["function"]["description"],
-                                "category": route,
-                            }
-                        )
+                for schema in get_all_schemas():
+                    tools_list.append(
+                        {
+                            "name": schema["function"]["name"],
+                            "description": schema["function"]["description"],
+                        }
+                    )
 
                 response_data = json.dumps(tools_list).encode("utf-8")
             except Exception as e:
@@ -339,6 +337,33 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
             except Exception as e:
                 response_data = json.dumps({"error": str(e)}).encode("utf-8")
             
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.send_header("Content-Length", str(len(response_data)))
+            self.end_headers()
+            self.wfile.write(response_data)
+            return
+
+        elif self.path == "/api/shell-audit":
+            try:
+                conn = sqlite3.connect(DB_PATH)
+                conn.row_factory = dict_factory
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='shell_audit_log'"
+                )
+                if cursor.fetchone():
+                    cursor.execute(
+                        "SELECT * FROM shell_audit_log ORDER BY id DESC LIMIT 50"
+                    )
+                    entries = cursor.fetchall()
+                else:
+                    entries = []
+                conn.close()
+                response_data = json.dumps(entries).encode("utf-8")
+            except Exception as e:
+                response_data = json.dumps({"error": str(e)}).encode("utf-8")
+
             self.send_response(200)
             self.send_header("Content-type", "application/json")
             self.send_header("Content-Length", str(len(response_data)))

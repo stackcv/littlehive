@@ -78,6 +78,31 @@ def init_cache_db():
         )
     """)
 
+    # Shell Audit Log
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS shell_audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            command TEXT NOT NULL,
+            working_dir TEXT DEFAULT '',
+            status TEXT NOT NULL,
+            output_summary TEXT DEFAULT '',
+            executed_at DATETIME DEFAULT (datetime('now', 'localtime'))
+        )
+    """)
+
+    # Internal TODO List
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS internal_todos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            notes TEXT DEFAULT '',
+            status TEXT DEFAULT 'needsAction',
+            due TEXT DEFAULT '',
+            created_at DATETIME DEFAULT (datetime('now', 'localtime')),
+            updated_at DATETIME DEFAULT (datetime('now', 'localtime'))
+        )
+    """)
+
     conn.commit()
     conn.close()
 
@@ -287,3 +312,79 @@ def query_cached_tasks(list_id: str = None, status: str = None) -> str:
         })
     
     return json.dumps(tasks)
+
+
+# --- Internal TODO List ---
+def internal_create_todo(title: str, notes: str = "", due: str = "") -> dict:
+    conn = _get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO internal_todos (title, notes, due) VALUES (?, ?, ?)",
+        (title, notes or "", due or ""),
+    )
+    todo_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return {"status": "created", "id": todo_id, "title": title}
+
+
+def internal_get_todos(status: str = None) -> list:
+    conn = _get_db()
+    cursor = conn.cursor()
+    if status:
+        cursor.execute(
+            "SELECT * FROM internal_todos WHERE status = ? ORDER BY created_at DESC",
+            (status,),
+        )
+    else:
+        cursor.execute("SELECT * FROM internal_todos ORDER BY created_at DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [
+        {
+            "id": str(r["id"]),
+            "title": r["title"],
+            "notes": r["notes"],
+            "status": r["status"],
+            "due": r["due"],
+            "updated": r["updated_at"],
+        }
+        for r in rows
+    ]
+
+
+def internal_update_todo(todo_id: str, **kwargs) -> dict:
+    conn = _get_db()
+    cursor = conn.cursor()
+    sets = []
+    vals = []
+    for key in ("title", "notes", "status", "due"):
+        if key in kwargs and kwargs[key] is not None:
+            sets.append(f"{key} = ?")
+            vals.append(kwargs[key])
+    if not sets:
+        conn.close()
+        return {"error": "Nothing to update"}
+    sets.append("updated_at = datetime('now', 'localtime')")
+    vals.append(int(todo_id))
+    cursor.execute(
+        f"UPDATE internal_todos SET {', '.join(sets)} WHERE id = ?", tuple(vals)
+    )
+    conn.commit()
+    changed = cursor.rowcount
+    conn.close()
+    if changed == 0:
+        return {"error": f"Todo {todo_id} not found"}
+    return {"status": "updated", "id": todo_id}
+
+
+def internal_delete_todo(todo_id: str) -> dict:
+    conn = _get_db()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM internal_todos WHERE id = ?", (int(todo_id),))
+    conn.commit()
+    changed = cursor.rowcount
+    conn.close()
+    if changed == 0:
+        return {"error": f"Todo {todo_id} not found"}
+    return {"status": "deleted", "id": todo_id}

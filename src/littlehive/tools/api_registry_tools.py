@@ -183,6 +183,68 @@ def _fill_template(template: str, params: dict) -> str:
     return re.sub(r"\{(\w+)\}", replacer, template)
 
 
+def _is_numeric(val) -> bool:
+    try:
+        float(val)
+        return True
+    except (ValueError, TypeError):
+        return False
+
+
+def _auto_geocode(params: dict, url_template: str) -> dict:
+    """If the URL needs {latitude}/{longitude} but params have non-numeric values
+    (e.g. a city name), resolve them via Open-Meteo geocoding."""
+    needs_lat = "{latitude}" in url_template
+    needs_lon = "{longitude}" in url_template
+    if not (needs_lat or needs_lon):
+        return params
+
+    params = dict(params)
+
+    lat_val = params.get("latitude", "")
+    lon_val = params.get("longitude", "")
+
+    if _is_numeric(lat_val) and _is_numeric(lon_val):
+        return params
+
+    location_hint = ""
+    if lat_val and not _is_numeric(lat_val):
+        location_hint = str(lat_val)
+    elif lon_val and not _is_numeric(lon_val):
+        location_hint = str(lon_val)
+    elif params.get("location"):
+        location_hint = str(params["location"])
+    elif params.get("city"):
+        location_hint = str(params["city"])
+
+    if not location_hint:
+        from littlehive.agent.config import get_config
+        location_hint = get_config().get("home_location", "")
+
+    if not location_hint:
+        return params
+
+    try:
+        resp = requests.get(
+            "https://geocoding-api.open-meteo.com/v1/search",
+            params={"name": location_hint, "count": 1, "language": "en"},
+            timeout=5,
+        )
+        data = resp.json()
+        results = data.get("results", [])
+        if results:
+            params["latitude"] = str(round(results[0]["latitude"], 4))
+            params["longitude"] = str(round(results[0]["longitude"], 4))
+            logger.info(
+                f"[CustomAPI] Geocoded '{location_hint}' -> "
+                f"lat={params['latitude']}, lon={params['longitude']}"
+            )
+    except Exception as e:
+        logger.debug(f"[CustomAPI] Geocoding failed for '{location_hint}': {e}")
+
+    return params
+
+
 def call_api(name: str, params: dict = None) -> str:
     """Look up a registered API by name, fill templates, execute the request."""
     params = params or {}
@@ -200,6 +262,7 @@ def call_api(name: str, params: dict = None) -> str:
                 "available_apis": available,
             })
 
+        params = _auto_geocode(params, row["url"])
         url = _fill_template(row["url"], params)
         method = (row["method"] or "GET").upper()
 

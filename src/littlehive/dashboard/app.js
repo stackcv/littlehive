@@ -50,7 +50,16 @@ const toolFriendlyNames = {
     fetch_webpage:        "Reading a webpage",
     call_api:             "Calling a custom API",
     register_api:         "Registering a new API",
-    list_apis:            "Checking available APIs"
+    list_apis:            "Checking available APIs",
+    github_create_issue:  "Creating a GitHub issue",
+    github_list_issues:   "Checking GitHub issues",
+    github_update_issue:  "Updating a GitHub issue",
+    github_add_comment:   "Commenting on GitHub",
+    exec_command:         "Running a shell command",
+    read_file:            "Reading a file",
+    write_file:           "Writing a file",
+    list_directory:       "Listing directory contents",
+    announce:             "Speaking aloud"
 };
 
 /* ---------- Connection status ---------- */
@@ -160,6 +169,14 @@ async function loadConfig() {
         const config = await res.json();
         const container = document.getElementById('config-fields');
 
+        const shellEnabled = config.shell_enabled || false;
+        const shellWorkspace = config.shell_workspace || '~/littlehive-workspace';
+        const shellTimeout = config.shell_max_timeout || 60;
+        const ttsEngine = config.tts_engine || 'say';
+        const shellAllowed = (config.shell_allowed_commands || []).join(', ');
+        const shellLogged = (config.shell_logged_commands || []).join(', ');
+        const shellBlocked = (config.shell_blocked_commands || []).join(', ');
+
         container.innerHTML = `
             <div class="row">
                 <div class="col-md-6 mb-4">
@@ -204,6 +221,16 @@ async function loadConfig() {
                         </select>
                     </div>
 
+                    <div class="config-section-title mt-4"><i class="bi bi-list-check me-2"></i>Task Management</div>
+                    <div class="mb-3">
+                        <label class="form-label">TODO Provider <small class="attention-text ms-1">Requires restart</small></label>
+                        <select class="form-select" name="todo_provider">
+                            <option value="internal" ${(config.todo_provider || 'internal') === 'internal' ? 'selected' : ''}>Internal TODO List</option>
+                            <option value="google_tasks" ${config.todo_provider === 'google_tasks' ? 'selected' : ''}>Google Tasks</option>
+                        </select>
+                        <small class="text-muted">Internal stores tasks locally. Google Tasks syncs with your Google account.</small>
+                    </div>
+
                     <div class="config-section-title mt-4"><i class="bi bi-send me-2"></i>Channels</div>
                     <div class="mb-3">
                         <label class="form-label">Telegram Bot Token</label>
@@ -212,6 +239,68 @@ async function loadConfig() {
                     <div class="mb-3">
                         <label class="form-label">Telegram Chat ID</label>
                         <input type="text" class="form-control" name="telegram_chat_id" value="${config.telegram_chat_id || ''}">
+                    </div>
+
+                    <div class="config-section-title mt-4"><i class="bi bi-github me-2"></i>GitHub <small class="attention-text ms-1">Requires restart</small></div>
+                    <div class="mb-3">
+                        <label class="form-label">Personal Access Token</label>
+                        <input type="password" class="form-control" name="github_token" value="${config.github_token || ''}" placeholder="ghp_...">
+                        <small class="text-muted">Needs <code>repo</code> scope. <a href="https://github.com/settings/tokens/new?scopes=repo" target="_blank">Create one</a></small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Default Repository</label>
+                        <input type="text" class="form-control" name="github_default_repo" value="${config.github_default_repo || ''}" placeholder="owner/repo">
+                    </div>
+                </div>
+            </div>
+
+            <hr style="border-color:var(--border)">
+
+            <div class="row">
+                <div class="col-12 mb-2">
+                    <div class="config-section-title"><i class="bi bi-terminal me-2"></i>Shell & File Tools <small class="attention-text ms-1">Requires restart</small></div>
+                </div>
+                <div class="col-md-6 mb-4">
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="shell-enabled-toggle" ${shellEnabled ? 'checked' : ''}>
+                            <label class="form-check-label fw-semibold" for="shell-enabled-toggle">Enable Shell Tools</label>
+                        </div>
+                        <small class="text-muted">Allows the agent to run commands, read/write files, and use TTS</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Workspace Folder</label>
+                        <input type="text" class="form-control" id="shell-workspace-input" value="${shellWorkspace}">
+                        <small class="text-muted">Agent can only operate within this directory</small>
+                    </div>
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label class="form-label">Command Timeout</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="shell-timeout-input" value="${shellTimeout}" min="5" max="300">
+                                <span class="input-group-text">sec</span>
+                            </div>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label class="form-label">TTS Engine</label>
+                            <select class="form-select" id="shell-tts-input">
+                                <option value="say" ${ttsEngine === 'say' ? 'selected' : ''}>say (macOS)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 mb-4">
+                    <div class="mb-3">
+                        <label class="form-label">Allowed Commands <small class="text-muted">(auto-execute, no logging)</small></label>
+                        <textarea class="form-control" id="shell-allowed-input" rows="2" style="font-size:.85rem">${shellAllowed}</textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Logged Commands <small class="text-muted">(execute + audit trail)</small></label>
+                        <textarea class="form-control" id="shell-logged-input" rows="2" style="font-size:.85rem">${shellLogged}</textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Blocked Commands <small class="text-muted">(always denied)</small></label>
+                        <textarea class="form-control" id="shell-blocked-input" rows="2" style="font-size:.85rem">${shellBlocked}</textarea>
                     </div>
                 </div>
             </div>
@@ -223,6 +312,10 @@ async function loadConfig() {
     } catch(e) { console.error(e); }
 }
 
+function _parseCommaSeparated(text) {
+    return text.split(',').map(s => s.trim()).filter(Boolean);
+}
+
 async function saveConfig(e) {
     e.preventDefault();
     const formData = new FormData(e.target);
@@ -231,6 +324,27 @@ async function saveConfig(e) {
         if (!isNaN(value) && value.trim() !== '') configData[key] = Number(value);
         else configData[key] = value;
     });
+
+    const shellToggle = document.getElementById('shell-enabled-toggle');
+    if (shellToggle) configData.shell_enabled = shellToggle.checked;
+
+    const shellWs = document.getElementById('shell-workspace-input');
+    if (shellWs) configData.shell_workspace = shellWs.value.trim();
+
+    const shellTimeout = document.getElementById('shell-timeout-input');
+    if (shellTimeout) configData.shell_max_timeout = parseInt(shellTimeout.value, 10) || 60;
+
+    const ttsInput = document.getElementById('shell-tts-input');
+    if (ttsInput) configData.tts_engine = ttsInput.value;
+
+    const allowedInput = document.getElementById('shell-allowed-input');
+    if (allowedInput) configData.shell_allowed_commands = _parseCommaSeparated(allowedInput.value);
+
+    const loggedInput = document.getElementById('shell-logged-input');
+    if (loggedInput) configData.shell_logged_commands = _parseCommaSeparated(loggedInput.value);
+
+    const blockedInput = document.getElementById('shell-blocked-input');
+    if (blockedInput) configData.shell_blocked_commands = _parseCommaSeparated(blockedInput.value);
 
     try {
         const res = await fetch('/api/config', {
@@ -475,7 +589,7 @@ async function deleteApi(name) {
 
 /* ---------- Scheduler ---------- */
 async function loadScheduler() {
-    document.getElementById('page-title').innerText = "Scheduler";
+    document.getElementById('page-title').innerText = "System";
     try {
         const res = await fetch('/api/config', { cache: 'no-store' });
         const config = await res.json();
@@ -503,6 +617,8 @@ async function loadScheduler() {
         document.getElementById('nightly_memory_time').value = config.nightly_memory_time || "03:15";
 
     } catch(e) { console.error(e); }
+
+    loadShellAudit();
 }
 
 async function saveScheduler(e) {
@@ -562,6 +678,44 @@ function flushReminders() {
 }
 function flushAllReminders() {
     _flushTarget('all_reminders', 'This will delete ALL reminders (pending and completed). Are you sure?');
+}
+
+/* ---------- Shell Audit Log ---------- */
+async function loadShellAudit() {
+    try {
+        const res = await fetch('/api/shell-audit', { cache: 'no-store' });
+        const entries = await res.json();
+        const tbody = document.getElementById('shell-audit-body');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+
+        if (!Array.isArray(entries) || entries.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">No shell commands recorded yet.</td></tr>';
+            return;
+        }
+
+        entries.forEach(e => {
+            const statusBadge = e.status === 'success'
+                ? '<span class="badge bg-success">OK</span>'
+                : e.status === 'denied'
+                ? '<span class="badge bg-danger">Denied</span>'
+                : `<span class="badge bg-warning text-dark">${e.status}</span>`;
+
+            const shortCmd = e.command.length > 80 ? e.command.substring(0, 77) + '...' : e.command;
+            const shortOut = (e.output_summary || '-').length > 60
+                ? (e.output_summary || '').substring(0, 57) + '...'
+                : (e.output_summary || '-');
+
+            tbody.innerHTML += `<tr>
+                <td><small>${e.executed_at || ''}</small></td>
+                <td><code title="${e.command.replace(/"/g, '&quot;')}">${shortCmd}</code></td>
+                <td class="text-center">${statusBadge}</td>
+                <td><small class="text-muted">${shortOut}</small></td>
+            </tr>`;
+        });
+    } catch (e) {
+        console.error('Error loading shell audit', e);
+    }
 }
 
 /* ---------- Theme ---------- */

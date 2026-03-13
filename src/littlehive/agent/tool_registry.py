@@ -28,8 +28,8 @@ from littlehive.tools.messaging_tools import (
     execute_tool as messaging_execute,
 )
 from littlehive.tools.google_tasks import (
-    TASKS_TOOLS_SCHEMA,
-    execute_tool as tasks_execute,
+    TASKS_TOOLS_SCHEMA as GOOGLE_TASKS_SCHEMA,
+    execute_tool as google_tasks_execute,
 )
 from littlehive.tools.web_tools import (
     WEB_TOOLS_SCHEMA,
@@ -39,11 +39,118 @@ from littlehive.tools.api_registry_tools import (
     API_REGISTRY_TOOLS_SCHEMA,
     execute_tool as api_registry_execute,
 )
+from littlehive.tools.shell_tools import (
+    SHELL_TOOLS_SCHEMA,
+    execute_tool as shell_execute,
+)
+from littlehive.tools.github_tools import (
+    GITHUB_TOOLS_SCHEMA,
+    execute_tool as github_execute,
+)
 from littlehive.tools.memory_tools import (
     save_core_fact,
     search_past_conversations,
     delete_core_fact,
 )
+
+INTERNAL_TASKS_SCHEMA = [
+    {
+        "type": "function",
+        "function": {
+            "name": "get_tasks",
+            "description": "Fetch tasks from the local TODO list. Filter by status ('needsAction', 'completed').",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "status": {"type": "string", "enum": ["needsAction", "completed"]}
+                }
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_task",
+            "description": "Add a new task to the local TODO list (for project/to-do management). Do NOT use this for timed personal alarms or reminders (use set_reminder instead).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string"},
+                    "notes": {"type": "string"},
+                    "due": {"type": "string", "description": "RFC 3339 timestamp (e.g. 2026-03-09T12:00:00Z)"},
+                },
+                "required": ["title"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_task",
+            "description": "Modify a task or mark it completed (status='completed').",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "task_id": {"type": "string"},
+                    "title": {"type": "string"},
+                    "notes": {"type": "string"},
+                    "status": {"type": "string", "enum": ["needsAction", "completed"]},
+                    "due": {"type": "string"}
+                },
+                "required": ["task_id"]
+            }
+        }
+    }
+]
+
+
+def _internal_tasks_execute(tool_name: str, args: Dict[str, Any]) -> str:
+    from littlehive.agent.local_cache import (
+        internal_create_todo,
+        internal_get_todos,
+        internal_update_todo,
+        internal_delete_todo,
+    )
+    try:
+        if tool_name == "get_tasks":
+            return json.dumps(internal_get_todos(status=args.get("status")))
+        elif tool_name == "create_task":
+            return json.dumps(internal_create_todo(
+                title=args["title"],
+                notes=args.get("notes", ""),
+                due=args.get("due", ""),
+            ))
+        elif tool_name == "update_task":
+            return json.dumps(internal_update_todo(
+                todo_id=args["task_id"],
+                title=args.get("title"),
+                notes=args.get("notes"),
+                status=args.get("status"),
+                due=args.get("due"),
+            ))
+        elif tool_name == "delete_task":
+            return json.dumps(internal_delete_todo(todo_id=args["task_id"]))
+        else:
+            return json.dumps({"error": f"Unknown task tool: {tool_name}"})
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+def _get_tasks_schema():
+    from littlehive.agent.config import get_config
+    provider = get_config().get("todo_provider", "internal")
+    if provider == "google_tasks":
+        return GOOGLE_TASKS_SCHEMA
+    return INTERNAL_TASKS_SCHEMA
+
+
+def _tasks_dispatch(tool_name: str, args: Dict[str, Any]) -> str:
+    from littlehive.agent.config import get_config
+    provider = get_config().get("todo_provider", "internal")
+    if provider == "google_tasks":
+        return google_tasks_execute(tool_name, args)
+    return _internal_tasks_execute(tool_name, args)
+
 
 MEMORY_TOOLS_SCHEMA = [
     {
@@ -114,42 +221,35 @@ def memory_execute(tool_name: str, args: Dict[str, Any]) -> str:
         return json.dumps({"error": str(e)})
 
 
-EA_PERSONA_TOOLS = (
-    EMAIL_TOOLS_SCHEMA
-    + CALENDAR_TOOLS_SCHEMA
-    + FINANCE_TOOLS_SCHEMA
-    + REMINDER_TOOLS_SCHEMA
-    + STAKEHOLDER_TOOLS_SCHEMA
-    + MEMORY_TOOLS_SCHEMA
-    + MESSAGING_TOOLS_SCHEMA
-    + QUEUE_TOOLS_SCHEMA
-    + TASKS_TOOLS_SCHEMA
-    + WEB_TOOLS_SCHEMA
-    + API_REGISTRY_TOOLS_SCHEMA
-)
+def _build_tool_list() -> List[Dict[str, Any]]:
+    """Build the tool schema list, conditionally including optional tools."""
+    from littlehive.agent.config import get_config
+    tools = (
+        EMAIL_TOOLS_SCHEMA
+        + CALENDAR_TOOLS_SCHEMA
+        + FINANCE_TOOLS_SCHEMA
+        + REMINDER_TOOLS_SCHEMA
+        + STAKEHOLDER_TOOLS_SCHEMA
+        + MEMORY_TOOLS_SCHEMA
+        + MESSAGING_TOOLS_SCHEMA
+        + QUEUE_TOOLS_SCHEMA
+        + _get_tasks_schema()
+        + WEB_TOOLS_SCHEMA
+        + API_REGISTRY_TOOLS_SCHEMA
+    )
+    config = get_config()
+    if config.get("shell_enabled", False):
+        tools = tools + SHELL_TOOLS_SCHEMA
+    if config.get("github_token", ""):
+        tools = tools + GITHUB_TOOLS_SCHEMA
+    return tools
 
-ROUTE_SCHEMAS = {
-    "calendar": EA_PERSONA_TOOLS,
-    "email": EA_PERSONA_TOOLS,
-    "finance": EA_PERSONA_TOOLS,
-    "reminder": EA_PERSONA_TOOLS,
-    "memory": EA_PERSONA_TOOLS,
-    "tasks": EA_PERSONA_TOOLS,
-    "web": EA_PERSONA_TOOLS,
-}
 
+EA_PERSONA_TOOLS = _build_tool_list()
 
 def get_all_schemas() -> List[Dict[str, Any]]:
-    """Returns all available schemas across all routes without duplicates."""
-    all_tools = []
-    seen_names = set()
-    for schemas in ROUTE_SCHEMAS.values():
-        for schema in schemas:
-            name = schema["function"]["name"]
-            if name not in seen_names:
-                seen_names.add(name)
-                all_tools.append(schema)
-    return all_tools
+    """Returns all available tool schemas."""
+    return list(EA_PERSONA_TOOLS)
 
 
 def dispatch_tool(tool_name: str, tool_args: Dict[str, Any]) -> str:
@@ -196,10 +296,10 @@ def dispatch_tool(tool_name: str, tool_args: Dict[str, Any]) -> str:
     if tool_name in messaging_tool_names:
         return messaging_execute(tool_name, tool_args)
 
-    # 9. Google Tasks tools
-    tasks_tool_names = [t["function"]["name"] for t in TASKS_TOOLS_SCHEMA]
+    # 9. Tasks tools (internal or Google Tasks based on config)
+    tasks_tool_names = [t["function"]["name"] for t in _get_tasks_schema()]
     if tool_name in tasks_tool_names:
-        return tasks_execute(tool_name, tool_args)
+        return _tasks_dispatch(tool_name, tool_args)
 
     # 10. Web search tools
     web_tool_names = [t["function"]["name"] for t in WEB_TOOLS_SCHEMA]
@@ -210,5 +310,18 @@ def dispatch_tool(tool_name: str, tool_args: Dict[str, Any]) -> str:
     api_tool_names = [t["function"]["name"] for t in API_REGISTRY_TOOLS_SCHEMA]
     if tool_name in api_tool_names:
         return api_registry_execute(tool_name, tool_args)
+
+    # 12. Shell / file / TTS tools (only dispatches if shell_enabled)
+    shell_tool_names = [t["function"]["name"] for t in SHELL_TOOLS_SCHEMA]
+    if tool_name in shell_tool_names:
+        from littlehive.agent.config import get_config
+        if not get_config().get("shell_enabled", False):
+            return json.dumps({"error": "Shell tools are disabled. Enable them in Settings."})
+        return shell_execute(tool_name, tool_args)
+
+    # 13. GitHub tools
+    github_tool_names = [t["function"]["name"] for t in GITHUB_TOOLS_SCHEMA]
+    if tool_name in github_tool_names:
+        return github_execute(tool_name, tool_args)
 
     return json.dumps({"error": f"Tool '{tool_name}' not found in registry."})

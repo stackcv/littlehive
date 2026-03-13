@@ -17,6 +17,30 @@ DEFAULT_CONFIG = {
     "model_path": "mlx-community/mistralai_Ministral-3-14B-Instruct-2512-MLX-MXFP4",
     "dnd_start": 23,
     "dnd_end": 7,
+    "shell_enabled": False,
+    "shell_workspace": "~/littlehive-workspace",
+    "shell_allowed_commands": [
+        "ls", "cat", "head", "tail", "find", "grep", "wc", "du", "df",
+        "echo", "pwd", "date", "which", "uname", "whoami",
+        "git status", "git log", "git diff", "git branch",
+        "pip list", "pip show", "npm list", "brew list",
+        "curl", "ping",
+    ],
+    "shell_logged_commands": [
+        "mkdir", "cp", "mv", "touch", "rm",
+        "git add", "git commit", "git push", "git pull", "git checkout",
+        "python", "node", "pip install", "npm install",
+        "say",
+    ],
+    "shell_blocked_commands": [
+        "rm -rf", "sudo", "su", "chmod", "chown", "dd", "mkfs",
+        "eval", "export PATH", "systemctl", "launchctl",
+    ],
+    "shell_max_timeout": 60,
+    "tts_engine": "say",
+    "github_token": "",
+    "github_default_repo": "",
+    "todo_provider": "internal",
 }
 
 _cached_config = None

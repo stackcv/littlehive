@@ -25,8 +25,7 @@ import mlx.core as mx
 from mlx_lm import load, generate, stream_generate
 from mlx_lm.models.cache import make_prompt_cache
 from mlx_lm.sample_utils import make_sampler
-from littlehive.agent.tool_registry import dispatch_tool
-from littlehive.agent.tool_router import get_active_tools
+from littlehive.agent.tool_registry import dispatch_tool, EA_PERSONA_TOOLS
 from littlehive.agent.locks import mlx_lock
 from littlehive.agent.parser import parse_mistral_tool_calls
 from littlehive.tools.memory_tools import archive_messages
@@ -187,6 +186,37 @@ def telegram_worker():
 
 
 
+_geocode_cache = {}
+
+def _geocode_location(location_str: str) -> tuple:
+    """Resolve a city/location name to (latitude, longitude) using Open-Meteo geocoding.
+    Returns (None, None) on failure. Results are cached in-memory."""
+    if not location_str or location_str == "Unknown Location":
+        return None, None
+
+    if location_str in _geocode_cache:
+        return _geocode_cache[location_str]
+
+    try:
+        resp = requests.get(
+            "https://geocoding-api.open-meteo.com/v1/search",
+            params={"name": location_str, "count": 1, "language": "en"},
+            timeout=5,
+        )
+        data = resp.json()
+        results = data.get("results", [])
+        if results:
+            lat = round(results[0]["latitude"], 4)
+            lon = round(results[0]["longitude"], 4)
+            _geocode_cache[location_str] = (lat, lon)
+            return lat, lon
+    except Exception:
+        pass
+
+    _geocode_cache[location_str] = (None, None)
+    return None, None
+
+
 def get_system_prompt():
     config = get_config()
     location_str = config.get("home_location", "Unknown Location")
@@ -220,10 +250,15 @@ def get_system_prompt():
     except Exception:
         pass
 
+    lat, lon = _geocode_location(location_str)
+    location_with_coords = location_str
+    if lat is not None and lon is not None:
+        location_with_coords = f"{location_str} (latitude={lat}, longitude={lon})"
+
     rendered = template.format(
         date=datetime.now().strftime("%A, %B %d, %Y"),
         timezone=os.environ.get("AGENT_TIMEZONE", default_tz),
-        location=location_str,
+        location=location_with_coords,
         agent_name=config.get("agent_name", "Roxy"),
         agent_title=config.get("agent_title", "Executive Staff"),
         user_name=config.get("user_name", "John Doe"),
@@ -245,8 +280,7 @@ def main():
         f"Initializing Core Brain & loading model ({model_path.split('/')[-1]})..."
     )
 
-    from littlehive.agent.tool_registry import ROUTE_SCHEMAS
-    all_possible_tools = ROUTE_SCHEMAS["email"]
+    all_possible_tools = EA_PERSONA_TOOLS
 
     def warm_cache(messages_list, cache, tools_list):
         """Pre-encode the system prompt + tool schemas into the KV cache.
@@ -481,17 +515,9 @@ def main():
 
         try:
             while True:  # Tool Chaining Loop
-                current_route_tools = get_active_tools(user_input)
-
-                all_required_tools = list(historically_active_tools)
-                for tool in current_route_tools:
-                    if tool not in all_required_tools:
-                        all_required_tools.append(tool)
-                        historically_active_tools.append(tool)
-
                 chat_kwargs = {"tokenize": False, "add_generation_prompt": True}
-                if all_required_tools:
-                    chat_kwargs["tools"] = all_required_tools
+                if historically_active_tools:
+                    chat_kwargs["tools"] = historically_active_tools
 
                 # Use the modified active_messages_for_turn which may contain the attachment
                 full_prompt_text = tokenizer.apply_chat_template(

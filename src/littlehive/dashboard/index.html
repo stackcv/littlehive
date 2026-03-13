@@ -36,14 +36,14 @@
                 <a class="nav-link" id="tab-memories" data-bs-toggle="pill" href="#v-memories" role="tab" onclick="loadMemories()">
                     <i class="bi bi-lightbulb me-2"></i>Memories
                 </a>
-                <a class="nav-link" id="tab-config" data-bs-toggle="pill" href="#v-config" role="tab" onclick="loadConfig()">
-                    <i class="bi bi-sliders me-2"></i>Settings
-                </a>
                 <a class="nav-link" id="tab-apis" data-bs-toggle="pill" href="#v-apis" role="tab" onclick="loadApis()">
                     <i class="bi bi-plug me-2"></i>Custom APIs
                 </a>
                 <a class="nav-link" id="tab-scheduler" data-bs-toggle="pill" href="#v-scheduler" role="tab" onclick="loadScheduler()">
-                    <i class="bi bi-arrow-repeat me-2"></i>Scheduler
+                    <i class="bi bi-gear me-2"></i>System
+                </a>
+                <a class="nav-link" id="tab-config" data-bs-toggle="pill" href="#v-config" role="tab" onclick="loadConfig()">
+                    <i class="bi bi-sliders me-2"></i>Settings
                 </a>
             </div>
             <div class="sidebar-version" id="sidebar-version"></div>
@@ -460,6 +460,30 @@
                                 </button>
                                 <span id="flush-status" class="save-toast ms-2" style="display:none;"><i class="bi bi-check-circle"></i> Done!</span>
                             </div>
+                        </div>
+                    </div>
+
+                    <div class="card mt-3">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span class="fw-bold"><i class="bi bi-terminal me-2 text-brand"></i>Shell Audit Log</span>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="loadShellAudit()">
+                                <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                            </button>
+                        </div>
+                        <div class="card-body p-0">
+                            <table class="table table-hover mb-0" style="font-size:.85rem">
+                                <thead>
+                                    <tr>
+                                        <th style="width:160px">Time</th>
+                                        <th>Command</th>
+                                        <th style="width:90px" class="text-center">Status</th>
+                                        <th>Output</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="shell-audit-body">
+                                    <tr><td colspan="4" class="text-center text-muted py-3">No shell commands recorded yet.</td></tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
