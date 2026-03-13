@@ -23,6 +23,7 @@ dependencies = [
   "markdown",
   "fpdf2",
   "ddgs",
+  "trafilatura",
 ]
 
 [project.optional-dependencies]

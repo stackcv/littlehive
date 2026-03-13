@@ -35,6 +35,10 @@ from littlehive.tools.web_tools import (
     WEB_TOOLS_SCHEMA,
     execute_tool as web_execute,
 )
+from littlehive.tools.api_registry_tools import (
+    API_REGISTRY_TOOLS_SCHEMA,
+    execute_tool as api_registry_execute,
+)
 from littlehive.tools.memory_tools import (
     save_core_fact,
     search_past_conversations,
@@ -121,6 +125,7 @@ EA_PERSONA_TOOLS = (
     + QUEUE_TOOLS_SCHEMA
     + TASKS_TOOLS_SCHEMA
     + WEB_TOOLS_SCHEMA
+    + API_REGISTRY_TOOLS_SCHEMA
 )
 
 ROUTE_SCHEMAS = {
@@ -200,5 +205,10 @@ def dispatch_tool(tool_name: str, tool_args: Dict[str, Any]) -> str:
     web_tool_names = [t["function"]["name"] for t in WEB_TOOLS_SCHEMA]
     if tool_name in web_tool_names:
         return web_execute(tool_name, tool_args)
+
+    # 11. Custom API registry tools
+    api_tool_names = [t["function"]["name"] for t in API_REGISTRY_TOOLS_SCHEMA]
+    if tool_name in api_tool_names:
+        return api_registry_execute(tool_name, tool_args)
 
     return json.dumps({"error": f"Tool '{tool_name}' not found in registry."})

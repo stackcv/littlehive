@@ -39,6 +39,9 @@
                 <a class="nav-link" id="tab-config" data-bs-toggle="pill" href="#v-config" role="tab" onclick="loadConfig()">
                     <i class="bi bi-sliders me-2"></i>Settings
                 </a>
+                <a class="nav-link" id="tab-apis" data-bs-toggle="pill" href="#v-apis" role="tab" onclick="loadApis()">
+                    <i class="bi bi-plug me-2"></i>Custom APIs
+                </a>
                 <a class="nav-link" id="tab-scheduler" data-bs-toggle="pill" href="#v-scheduler" role="tab" onclick="loadScheduler()">
                     <i class="bi bi-arrow-repeat me-2"></i>Scheduler
                 </a>
@@ -263,6 +266,97 @@
                     </div>
                 </div>
 
+                <!-- ==================== Custom APIs Tab ==================== -->
+                <div class="tab-pane fade" id="v-apis" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span class="fw-bold"><i class="bi bi-plug me-2 text-brand"></i>Custom API Registry</span>
+                            <button class="btn btn-sm btn-brand" onclick="openApiModal()">
+                                <i class="bi bi-plus-lg me-1"></i>Register API
+                            </button>
+                        </div>
+                        <div class="card-body p-0">
+                            <table class="table table-hover mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Method</th>
+                                        <th>URL</th>
+                                        <th>Description</th>
+                                        <th class="text-center" style="width:90px">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="apis-table-body">
+                                    <tr><td colspan="5" class="text-center text-muted py-4">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="card mt-3">
+                        <div class="card-body">
+                            <p class="text-muted mb-1" style="font-size:.85rem">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Custom APIs let your agent call external services. Use <code>{placeholders}</code> in URLs and body templates for dynamic parameters.
+                                You can also register APIs by chatting with the agent: <em>"Register an API called get_weather at https://api.open-meteo.com/..."</em>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- API Modal -->
+                <div class="modal fade" id="apiModal" tabindex="-1" aria-hidden="true">
+                  <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                      <div class="modal-header">
+                        <h5 class="modal-title" id="apiModalTitle">Register Custom API</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                      </div>
+                      <div class="modal-body">
+                        <form id="api-form">
+                            <input type="hidden" id="api-edit-name">
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">Name <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="api-name" placeholder="e.g. get_weather" required>
+                                    <small class="text-muted">Lowercase, no spaces</small>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">Method</label>
+                                    <select class="form-select" id="api-method">
+                                        <option value="GET" selected>GET</option>
+                                        <option value="POST">POST</option>
+                                        <option value="PUT">PUT</option>
+                                        <option value="PATCH">PATCH</option>
+                                        <option value="DELETE">DELETE</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">URL <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="api-url" placeholder="https://api.example.com/{param}" required>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Description</label>
+                                <input type="text" class="form-control" id="api-description" placeholder="What does this API do?">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Headers <small class="text-muted">(JSON)</small></label>
+                                <input type="text" class="form-control" id="api-headers" placeholder='{"Authorization": "Bearer your_token"}'>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Body Template <small class="text-muted">(POST/PUT only, JSON with {placeholders})</small></label>
+                                <textarea class="form-control" id="api-body" rows="2" placeholder='{"entity_id": "{entity_id}"}'></textarea>
+                            </div>
+                        </form>
+                      </div>
+                      <div class="modal-footer">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-sm btn-brand" onclick="saveApi()">Save API</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <!-- ==================== Scheduler Tab ==================== -->
                 <div class="tab-pane fade" id="v-scheduler" role="tabpanel">
                     <div class="card">
@@ -345,6 +439,27 @@
                                     <span id="save-scheduler-status" class="save-toast ms-3" style="display:none;"><i class="bi bi-check-circle"></i> Saved! Restart agent to apply.</span>
                                 </div>
                             </form>
+                        </div>
+                    </div>
+
+                    <div class="card mt-3">
+                        <div class="card-header fw-bold">
+                            <i class="bi bi-trash3 me-2 text-brand"></i>Data Management
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted small mb-3">Clear stale or stuck data from the queues. This cannot be undone.</p>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <button class="btn btn-sm btn-outline-danger" onclick="flushTaskQueue()">
+                                    <i class="bi bi-x-circle me-1"></i>Flush Task Queue
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="flushReminders()">
+                                    <i class="bi bi-bell-slash me-1"></i>Flush Completed Reminders
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="flushAllReminders()">
+                                    <i class="bi bi-bell-slash-fill me-1"></i>Flush ALL Reminders
+                                </button>
+                                <span id="flush-status" class="save-toast ms-2" style="display:none;"><i class="bi bi-check-circle"></i> Done!</span>
+                            </div>
                         </div>
                     </div>
                 </div>

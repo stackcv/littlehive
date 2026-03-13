@@ -96,15 +96,22 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
                     "SELECT name FROM sqlite_master WHERE type='table' AND name='cached_events'"
                 )
                 if cursor.fetchone():
-                    from datetime import datetime
-                    now_iso = datetime.now().astimezone().isoformat()
+                    from datetime import datetime, timedelta
+                    today_str = datetime.now().strftime("%Y-%m-%d")
+                    tomorrow_str = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
                     cursor.execute(
                         "SELECT * FROM cached_events WHERE start_time >= ? ORDER BY start_time ASC LIMIT 10",
-                        (now_iso[:10],)
+                        (today_str,)
                     )
                     events = cursor.fetchall()
+                    cursor.execute(
+                        "SELECT COUNT(*) as cnt FROM cached_events WHERE start_time >= ? AND start_time < ?",
+                        (today_str, tomorrow_str)
+                    )
+                    today_event_count = cursor.fetchone()["cnt"]
                 else:
                     events = []
+                    today_event_count = 0
 
                 conn.close()
 
@@ -127,12 +134,13 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
                         "reminders": reminders,
                         "emails": unread_emails,
                         "events": events,
+                        "today_event_count": today_event_count,
                         "pending_tasks": pending_tasks,
                     }
                 ).encode("utf-8")
             except Exception as e:
                 response_data = json.dumps(
-                    {"error": str(e), "bills": [], "reminders": [], "emails": [], "events": [], "pending_tasks": []}
+                    {"error": str(e), "bills": [], "reminders": [], "emails": [], "events": [], "today_event_count": 0, "pending_tasks": []}
                 ).encode("utf-8")
             
             self.send_response(200)
@@ -294,6 +302,31 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(response_data)
             return
 
+        elif self.path == "/api/custom-apis":
+            try:
+                conn = sqlite3.connect(DB_PATH)
+                conn.row_factory = dict_factory
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='custom_apis'"
+                )
+                if cursor.fetchone():
+                    cursor.execute("SELECT * FROM custom_apis ORDER BY name")
+                    apis = cursor.fetchall()
+                else:
+                    apis = []
+                conn.close()
+                response_data = json.dumps(apis).encode("utf-8")
+            except Exception as e:
+                response_data = json.dumps({"error": str(e)}).encode("utf-8")
+
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.send_header("Content-Length", str(len(response_data)))
+            self.end_headers()
+            self.wfile.write(response_data)
+            return
+
         elif self.path == "/api/config":
             try:
                 with open(CONFIG_PATH, "r") as f:
@@ -368,6 +401,76 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
                     relationship=data.get("relationship", ""),
                     preferences=data.get("preferences", ""),
                     auto_respond=bool(data.get("auto_respond", False)),
+                )
+                response_data = res.encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-type", "application/json")
+                self.send_header("Content-Length", str(len(response_data)))
+                self.end_headers()
+                self.wfile.write(response_data)
+            except Exception as e:
+                response_data = json.dumps({"error": str(e)}).encode("utf-8")
+                self.send_response(500)
+                self.send_header("Content-type", "application/json")
+                self.send_header("Content-Length", str(len(response_data)))
+                self.end_headers()
+                self.wfile.write(response_data)
+            return
+
+        elif self.path == "/api/flush":
+            content_length = int(self.headers["Content-Length"])
+            post_data = self.rfile.read(content_length)
+            try:
+                data = json.loads(post_data.decode("utf-8"))
+                target = data.get("target", "")
+                conn = sqlite3.connect(DB_PATH)
+                cursor = conn.cursor()
+                msg = "Unknown target"
+
+                if target == "task_queue":
+                    cursor.execute(
+                        "DELETE FROM pending_tasks WHERE status IN ('queued', 'failed', 'failed_retry', 'processing')"
+                    )
+                    msg = f"Flushed {cursor.rowcount} pending/failed tasks"
+                elif target == "completed_reminders":
+                    cursor.execute(
+                        "DELETE FROM reminders WHERE status = 'completed'"
+                    )
+                    msg = f"Flushed {cursor.rowcount} completed reminders"
+                elif target == "all_reminders":
+                    cursor.execute("DELETE FROM reminders")
+                    msg = f"Flushed {cursor.rowcount} reminders"
+
+                conn.commit()
+                conn.close()
+                response_data = json.dumps({"success": True, "message": msg}).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-type", "application/json")
+                self.send_header("Content-Length", str(len(response_data)))
+                self.end_headers()
+                self.wfile.write(response_data)
+            except Exception as e:
+                response_data = json.dumps({"error": str(e)}).encode("utf-8")
+                self.send_response(500)
+                self.send_header("Content-type", "application/json")
+                self.send_header("Content-Length", str(len(response_data)))
+                self.end_headers()
+                self.wfile.write(response_data)
+            return
+
+        elif self.path == "/api/custom-apis":
+            content_length = int(self.headers["Content-Length"])
+            post_data = self.rfile.read(content_length)
+            try:
+                data = json.loads(post_data.decode("utf-8"))
+                from littlehive.tools.api_registry_tools import register_api
+                res = register_api(
+                    name=data.get("name", ""),
+                    url=data.get("url", ""),
+                    method=data.get("method", "GET"),
+                    headers=data.get("headers"),
+                    body_template=data.get("body_template", ""),
+                    description=data.get("description", ""),
                 )
                 response_data = res.encode("utf-8")
                 self.send_response(200)
@@ -503,6 +606,26 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
                 conn.close()
 
                 response_data = json.dumps({"success": True}).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-type", "application/json")
+                self.send_header("Content-Length", str(len(response_data)))
+                self.end_headers()
+                self.wfile.write(response_data)
+            except Exception as e:
+                response_data = json.dumps({"error": str(e)}).encode("utf-8")
+                self.send_response(500)
+                self.send_header("Content-type", "application/json")
+                self.send_header("Content-Length", str(len(response_data)))
+                self.end_headers()
+                self.wfile.write(response_data)
+            return
+
+        if self.path.startswith("/api/custom-apis/"):
+            try:
+                api_name = self.path.split("/")[-1]
+                from littlehive.tools.api_registry_tools import delete_api
+                res = delete_api(api_name)
+                response_data = res.encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-type", "application/json")
                 self.send_header("Content-Length", str(len(response_data)))

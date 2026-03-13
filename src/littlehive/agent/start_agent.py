@@ -213,7 +213,14 @@ def get_system_prompt():
         logger.error(f"Failed to load core facts: {e}")
         core_facts_str = "Memory subsystem unavailable."
 
-    return template.format(
+    custom_apis_str = ""
+    try:
+        from littlehive.tools.api_registry_tools import get_api_descriptions
+        custom_apis_str = get_api_descriptions()
+    except Exception:
+        pass
+
+    rendered = template.format(
         date=datetime.now().strftime("%A, %B %d, %Y"),
         timezone=os.environ.get("AGENT_TIMEZONE", default_tz),
         location=location_str,
@@ -222,6 +229,11 @@ def get_system_prompt():
         user_name=config.get("user_name", "John Doe"),
         core_facts=core_facts_str
     )
+
+    if custom_apis_str:
+        rendered += f"\n\n## REGISTERED CUSTOM APIs\n{custom_apis_str}"
+
+    return rendered
 
 def main():
     config = get_config()

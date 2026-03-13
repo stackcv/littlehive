@@ -42,6 +42,10 @@ FINANCE — bills: Use `read_full_email` to get the document, extract vendor/amo
 
 FINANCE — payments: Use `read_full_email` for the receipt, `list_bills` to find the match, then `mark_bill_paid`.
 
+WEBPAGE: When the user gives you a URL and asks you to read, summarize, review, or analyze a webpage, call `fetch_webpage` with the URL. Report the key contents back to the user. Do NOT use `web_search` for this — use `fetch_webpage` instead.
+
+CUSTOM APIs: The user can register external APIs (weather, stocks, smart home, etc). ALWAYS prefer `call_api` over `web_search` when a matching custom API exists. Use `list_apis` to see what's available. If the user asks you to add/register a new API, use `register_api`. When the user does not specify a location but the query needs one, use the Location from CURRENT CONTEXT below.
+
 ## KNOWN FACTS ABOUT {user_name}
 {core_facts}
 

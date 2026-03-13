@@ -46,7 +46,11 @@ const toolFriendlyNames = {
     list_tasks:           "Checking your tasks",
     create_task:          "Creating a task",
     complete_task:        "Completing a task",
-    web_search:           "Searching the web"
+    web_search:           "Searching the web",
+    fetch_webpage:        "Reading a webpage",
+    call_api:             "Calling a custom API",
+    register_api:         "Registering a new API",
+    list_apis:            "Checking available APIs"
 };
 
 /* ---------- Connection status ---------- */
@@ -82,7 +86,7 @@ async function loadDashboard() {
         const data = await res.json();
 
         document.getElementById('emails-count').innerText = data.emails ? data.emails.length : 0;
-        document.getElementById('events-count').innerText = data.events ? data.events.length : 0;
+        document.getElementById('events-count').innerText = data.today_event_count !== undefined ? data.today_event_count : (data.events ? data.events.length : 0);
         document.getElementById('reminders-count').innerText = data.reminders ? data.reminders.length : 0;
         document.getElementById('tasks-count').innerText = data.pending_tasks ? data.pending_tasks.length : 0;
         document.getElementById('bills-count').innerText = data.bills ? data.bills.length : 0;
@@ -377,6 +381,98 @@ async function deleteContact(id) {
     } catch (e) { console.error(e); alert('Error deleting contact'); }
 }
 
+/* ---------- Custom APIs ---------- */
+async function loadApis() {
+    document.getElementById('page-title').innerText = "Custom APIs";
+    try {
+        const res = await fetch('/api/custom-apis', { cache: 'no-store' });
+        const apis = await res.json();
+        const tbody = document.getElementById('apis-table-body');
+        tbody.innerHTML = '';
+
+        if (!Array.isArray(apis) || apis.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">No custom APIs registered yet.</td></tr>';
+            return;
+        }
+
+        apis.forEach(api => {
+            const shortUrl = api.url.length > 60 ? api.url.substring(0, 57) + '...' : api.url;
+            tbody.innerHTML += `
+                <tr>
+                    <td><code class="fw-semibold">${api.name}</code></td>
+                    <td><span class="badge bg-secondary">${api.method || 'GET'}</span></td>
+                    <td><small title="${api.url}">${shortUrl}</small></td>
+                    <td><small class="text-muted">${api.description || '-'}</small></td>
+                    <td class="text-center">
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteApi('${api.name}')">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+    } catch (e) {
+        console.error('Error loading APIs', e);
+    }
+}
+
+function openApiModal() {
+    document.getElementById('api-form').reset();
+    document.getElementById('api-edit-name').value = '';
+    document.getElementById('apiModalTitle').innerText = 'Register Custom API';
+    const modal = new bootstrap.Modal(document.getElementById('apiModal'));
+    modal.show();
+}
+
+async function saveApi() {
+    const name = document.getElementById('api-name').value.trim().toLowerCase().replace(/\s+/g, '_');
+    const url = document.getElementById('api-url').value.trim();
+    if (!name || !url) { alert('Name and URL are required'); return; }
+
+    let headersObj = null;
+    const headersStr = document.getElementById('api-headers').value.trim();
+    if (headersStr) {
+        try { headersObj = JSON.parse(headersStr); }
+        catch (e) { alert('Headers must be valid JSON'); return; }
+    }
+
+    const data = {
+        name: name,
+        url: url,
+        method: document.getElementById('api-method').value,
+        headers: headersObj,
+        body_template: document.getElementById('api-body').value.trim(),
+        description: document.getElementById('api-description').value.trim()
+    };
+
+    try {
+        const res = await fetch('/api/custom-apis', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        if (res.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('apiModal')).hide();
+            loadApis();
+        } else {
+            const err = await res.json();
+            alert('Failed: ' + (err.error || 'Unknown error'));
+        }
+    } catch (e) {
+        console.error(e);
+        alert('Error saving API');
+    }
+}
+
+async function deleteApi(name) {
+    if (!confirm(`Delete custom API "${name}"?`)) return;
+    try {
+        const res = await fetch(`/api/custom-apis/${name}`, { method: 'DELETE' });
+        if (res.ok) loadApis();
+        else alert('Failed to delete API');
+    } catch (e) { console.error(e); alert('Error deleting API'); }
+}
+
 /* ---------- Scheduler ---------- */
 async function loadScheduler() {
     document.getElementById('page-title').innerText = "Scheduler";
@@ -436,6 +532,36 @@ async function saveScheduler(e) {
             setTimeout(() => { status.style.display = 'none'; }, 3000);
         }
     } catch (e) { console.error('Error saving scheduler config', e); }
+}
+
+/* ---------- Flush controls ---------- */
+async function _flushTarget(target, confirmMsg) {
+    if (!confirm(confirmMsg)) return;
+    try {
+        const res = await fetch('/api/flush', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ target })
+        });
+        const data = await res.json();
+        const status = document.getElementById('flush-status');
+        if (status) {
+            status.textContent = data.message || 'Done!';
+            status.style.display = 'inline-flex';
+            setTimeout(() => { status.style.display = 'none'; }, 3000);
+        }
+        loadDashboard();
+    } catch (e) { console.error('Flush failed', e); alert('Flush failed'); }
+}
+
+function flushTaskQueue() {
+    _flushTarget('task_queue', 'This will remove all queued, stuck, and failed tasks. Continue?');
+}
+function flushReminders() {
+    _flushTarget('completed_reminders', 'Remove all completed reminders?');
+}
+function flushAllReminders() {
+    _flushTarget('all_reminders', 'This will delete ALL reminders (pending and completed). Are you sure?');
 }
 
 /* ---------- Theme ---------- */

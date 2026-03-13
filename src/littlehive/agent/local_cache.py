@@ -63,7 +63,21 @@ def init_cache_db():
             last_history_id TEXT
         )
     """)
-    
+
+    # Custom API Registry
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS custom_apis (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            url TEXT NOT NULL,
+            method TEXT DEFAULT 'GET',
+            headers TEXT DEFAULT '{}',
+            body_template TEXT DEFAULT '',
+            description TEXT DEFAULT '',
+            created_at DATETIME DEFAULT (datetime('now', 'localtime'))
+        )
+    """)
+
     conn.commit()
     conn.close()
 
