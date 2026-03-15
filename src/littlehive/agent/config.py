@@ -41,6 +41,15 @@ DEFAULT_CONFIG = {
     "github_token": "",
     "github_default_repo": "",
     "todo_provider": "internal",
+    "anticipation_enabled": True,
+    "anticipation_min_confidence": 0.5,
+    "anticipation_cooldown_hours": 4,
+    "anticipation_mining_lookback_days": 30,
+    "anticipation_min_frequency": 3,
+    "anticipation_check_interval_minutes": 15,
+    "self_healing_enabled": True,
+    "self_healing_max_retries": 2,
+    "self_healing_circuit_breaker_threshold": 5,
 }
 
 _cached_config = None

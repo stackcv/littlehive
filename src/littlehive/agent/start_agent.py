@@ -2,6 +2,7 @@ import sys
 import os
 import time
 import json
+import re
 import logging
 import threading
 from littlehive.agent.logger_setup import logger
@@ -26,9 +27,12 @@ from mlx_lm import load, generate, stream_generate
 from mlx_lm.models.cache import make_prompt_cache
 from mlx_lm.sample_utils import make_sampler
 from littlehive.agent.tool_registry import dispatch_tool, EA_PERSONA_TOOLS
+from littlehive.agent.self_healing import resilient_dispatch_tool
 from littlehive.agent.locks import mlx_lock
 from littlehive.agent.parser import parse_mistral_tool_calls
 from littlehive.tools.memory_tools import archive_messages
+from littlehive.agent.anticipation import log_action, _make_turn_id
+from littlehive.agent.slash_commands import try_slash_command
 
 # Global to store the latest Telegram chat ID for proactive notifications
 config_init = get_config()
@@ -233,7 +237,7 @@ def get_system_prompt():
             template = f.read()
     except Exception as e:
         logger.error(f"Failed to load system prompt from {prompt_path}: {e}")
-        template = "You are an AI assistant. (Fallback prompt due to error)\n### RUNTIME CONTEXT\n### CORE FACTS ABOUT THE PRINCIPAL\n{core_facts}"
+        template = "You are an AI assistant. (Fallback prompt due to error)\n### RUNTIME CONTEXT\n### CORE FACTS ABOUT THE PRINCIPAL\n{core_facts}\n{dynamic_context}"
 
     try:
         from littlehive.tools.memory_tools import get_all_core_facts
@@ -250,6 +254,14 @@ def get_system_prompt():
     except Exception:
         pass
 
+    # Build dynamic time-aware context
+    dynamic_context_str = ""
+    try:
+        from littlehive.agent.dynamic_context import build_dynamic_context
+        dynamic_context_str = build_dynamic_context()
+    except Exception as e:
+        logger.debug(f"Dynamic context generation skipped: {e}")
+
     lat, lon = _geocode_location(location_str)
     location_with_coords = location_str
     if lat is not None and lon is not None:
@@ -262,7 +274,8 @@ def get_system_prompt():
         agent_name=config.get("agent_name", "Roxy"),
         agent_title=config.get("agent_title", "Executive Staff"),
         user_name=config.get("user_name", "John Doe"),
-        core_facts=core_facts_str
+        core_facts=core_facts_str,
+        dynamic_context=dynamic_context_str,
     )
 
     if custom_apis_str:
@@ -386,24 +399,47 @@ def main():
                     parts.append(f"**Unread emails ({len(unread)}):**\n" + "\n".join(email_lines))
 
                 now = datetime.now()
-                end = now + timedelta(hours=12)
-                events_str = query_cached_events(
+                end_of_day = now.replace(hour=23, minute=59, second=59, microsecond=0)
+
+                # Today's remaining events (never bleed into tomorrow)
+                today_str = query_cached_events(
                     time_min=now.isoformat(),
-                    time_max=end.isoformat()
+                    time_max=end_of_day.isoformat()
                 )
-                events_data = _json.loads(events_str)
-                if events_data:
-                    seen_summaries = set()
-                    evt_lines = []
-                    for e in events_data[:10]:
-                        summary = e.get("summary", "Untitled")
-                        if summary in seen_summaries:
+                today_events = _json.loads(today_str)
+                if today_events:
+                    seen = set()
+                    lines = []
+                    for e in today_events[:10]:
+                        s = e.get("summary", "Untitled")
+                        if s in seen:
                             continue
-                        seen_summaries.add(summary)
-                        t = _friendly_time(e.get("start", ""))
-                        evt_lines.append(f"  - {summary} at {t}")
-                    if evt_lines:
-                        parts.append("**Upcoming today:**\n" + "\n".join(evt_lines[:5]))
+                        seen.add(s)
+                        lines.append(f"  - {s} at {_friendly_time(e.get('start', ''))}")
+                    if lines:
+                        label = "**Upcoming today:**" if now.hour < 18 else "**Remaining today:**"
+                        parts.append(label + "\n" + "\n".join(lines[:5]))
+
+                # Evening lookahead: after 6 PM, peek at tomorrow's morning events
+                if now.hour >= 18:
+                    tomorrow_start = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+                    tomorrow_noon = tomorrow_start.replace(hour=12)
+                    tmrw_str = query_cached_events(
+                        time_min=tomorrow_start.isoformat(),
+                        time_max=tomorrow_noon.isoformat()
+                    )
+                    tmrw_events = _json.loads(tmrw_str)
+                    if tmrw_events:
+                        seen = set()
+                        lines = []
+                        for e in tmrw_events[:5]:
+                            s = e.get("summary", "Untitled")
+                            if s in seen:
+                                continue
+                            seen.add(s)
+                            lines.append(f"  - {s} at {_friendly_time(e.get('start', ''))}")
+                        if lines:
+                            parts.append("**Heads-up for tomorrow morning:**\n" + "\n".join(lines))
 
                 from littlehive.tools.reminder_tools import get_pending_reminders
                 rem_str = get_pending_reminders()
@@ -479,9 +515,40 @@ def main():
             continue
 
         elif cmd == "/help":
-            reply = "🛠️ **Available Commands:**\n`/clear` - Clear the UI window (keeps memory)\n`/reset` or `/new` - Wipe agent's memory/context for a fresh start\n`/context` or `/status` - Check current token usage\n`/help` - Show this message"
+            reply = (
+                "🛠️ **Available Commands:**\n"
+                "`/clear` - Clear the UI window (keeps memory)\n"
+                "`/reset` or `/new` - Wipe agent's memory/context for a fresh start\n"
+                "`/context` or `/status` - Check current token usage\n"
+                "`/help` - Show this message\n\n"
+                "⚡ **Instant Slash Commands** (bypass AI, execute directly):\n"
+                "`/email <name> about <subject>: <body>` - Draft an email\n"
+                "`/remind <time> <task>` - Set a reminder (e.g. `/remind 5pm call mom`)\n"
+                "`/bill <amount> <vendor> due <date>` - Record a bill\n"
+                "`/search <query>` - Quick web search\n"
+                "`/cal [today|tomorrow|week]` - Check your calendar\n"
+                "`/bills` - List pending bills\n"
+                "`/reminders` - List pending reminders"
+            )
             outbox.put({"type": MSG_TYPE_DONE, "content": reply})
             continue
+
+        # --- SLASH COMMAND PRE-PROCESSOR ---
+        # Intercept structured commands and execute directly without LLM inference.
+        if user_input.strip().startswith("/"):
+            slash_response, slash_tool_info = try_slash_command(user_input)
+            if slash_response is not None:
+                logger.info(f"⚡ [SlashCmd] Handled instantly: {user_input[:40]}...")
+                outbox.put({"type": MSG_TYPE_DONE, "content": slash_response})
+                if slash_tool_info:
+                    log_action(
+                        slash_tool_info["tool"],
+                        slash_tool_info.get("args", {}),
+                        source=source,
+                        turn_id=_make_turn_id(user_input),
+                        session_position=0,
+                    )
+                continue
 
         current_time_str = datetime.now().strftime("%A, %b %d, %I:%M %p")
         # Removing "Source: Telegram" from the user input string.
@@ -511,9 +578,13 @@ def main():
 
         has_fired_tool_indicator = False
         message_start_time = time.time()
+        turn_id = _make_turn_id(user_input)
+        tool_chain_idx = 0
         logger.info(f"🧠 [Brain] Beginning thought process for: {user_input[:30]}...")
 
         try:
+            tool_call_prefix = re.compile(r"^\s*(?:</s>\s*)?\[TOOL_CALLS\]")
+            tool_call_anywhere = re.compile(r"\[TOOL_CALLS\]")
             while True:  # Tool Chaining Loop
                 chat_kwargs = {"tokenize": False, "add_generation_prompt": True}
                 if historically_active_tools:
@@ -525,6 +596,16 @@ def main():
                 )
                 full_prompt_tokens = tokenizer.encode(full_prompt_text)
                 prompt_tokens = full_prompt_tokens[len(previous_prompt_tokens) :]
+
+                # Guard against zero-token incremental prompts (can happen if cache
+                # state drifts from prompt state). Rebuild cache and run full prompt.
+                if len(prompt_tokens) == 0:
+                    logger.warning(
+                        "[Brain] Zero-token incremental prompt detected; rebuilding cache for full prompt evaluation."
+                    )
+                    prompt_cache = make_prompt_cache(model)
+                    previous_prompt_tokens = []
+                    prompt_tokens = full_prompt_tokens
 
                 temp = get_config().get("temperature", 0.35)
                 sampler = make_sampler(temp=temp)
@@ -545,13 +626,23 @@ def main():
                         sampler=sampler,
                     ):
                         if not first_token_received:
-                            # Once the first token is received, the graph compilation is definitively done
                             first_token_received = True
                         
                         full_response += response.text
                         
-                        if "[TOOL_CALLS]" in full_response:
+                        if tool_call_prefix.match(full_response):
                             is_tool_call = True
+
+                # Handle mid-response tool calls: the model sometimes emits
+                # explanation text before [TOOL_CALLS]. Strip the preamble so
+                # the tool call is still parsed and executed.
+                if not is_tool_call and tool_call_anywhere.search(full_response):
+                    tc_pos = full_response.index("[TOOL_CALLS]")
+                    preamble = full_response[:tc_pos].strip()
+                    if preamble:
+                        logger.info(f"  -> Stripped {len(preamble)}-char preamble before mid-response [TOOL_CALLS]")
+                    full_response = full_response[tc_pos:]
+                    is_tool_call = True
 
                 logger.info(f"  -> Done. length={len(full_response)}, is_tool_call={is_tool_call}")
 
@@ -604,11 +695,19 @@ def main():
                 tool_calls_list = parse_mistral_tool_calls(full_response)
 
                 if not tool_calls_list:
-                    err_msg = "Error: Model generated a malformed tool call that could not be parsed."
-                    outbox.put({"type": MSG_TYPE_ERROR, "content": err_msg})
-                    messages.append(
-                        {"role": "assistant", "content": f"System Error: {err_msg}"}
-                    )
+                    fallback_text = full_response.replace("[TOOL_CALLS]", "").strip()
+                    if fallback_text:
+                        logger.warning(
+                            "[Parser] Tool marker detected but no valid tool calls parsed; returning response as plain text."
+                        )
+                        messages.append({"role": "assistant", "content": fallback_text})
+                        outbox.put({"type": MSG_TYPE_DONE, "content": fallback_text})
+                    else:
+                        err_msg = "Error: Model generated a malformed tool call that could not be parsed."
+                        outbox.put({"type": MSG_TYPE_ERROR, "content": err_msg})
+                        messages.append(
+                            {"role": "assistant", "content": f"System Error: {err_msg}"}
+                        )
                     break
 
                 if not has_fired_tool_indicator:
@@ -647,7 +746,17 @@ def main():
                 for tc in tool_calls_list:
                     func_name = tc["name"]
                     func_args = tc["arguments"]
-                    tool_result = dispatch_tool(func_name, func_args)
+
+                    if get_config().get("self_healing_enabled", True):
+                        max_retries = get_config().get("self_healing_max_retries", 2)
+                        tool_result = resilient_dispatch_tool(
+                            dispatch_tool, func_name, func_args, max_retries=max_retries
+                        )
+                    else:
+                        tool_result = dispatch_tool(func_name, func_args)
+
+                    log_action(func_name, func_args, source=source, turn_id=turn_id, session_position=tool_chain_idx)
+                    tool_chain_idx += 1
                     
                     tool_msg = {"role": "tool", "name": func_name, "content": tool_result}
                     messages.append(tool_msg)

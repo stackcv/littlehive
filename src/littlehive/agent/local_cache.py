@@ -103,6 +103,83 @@ def init_cache_db():
         )
     """)
 
+    # --- Anticipation Engine Tables ---
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS user_actions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp DATETIME DEFAULT (datetime('now', 'localtime')),
+            hour INTEGER,
+            minute INTEGER,
+            day_of_week INTEGER,
+            day_of_month INTEGER,
+            tool_name TEXT NOT NULL,
+            action_category TEXT,
+            entities TEXT DEFAULT '[]',
+            turn_id TEXT,
+            session_position INTEGER DEFAULT 0,
+            source TEXT DEFAULT 'web'
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS action_patterns (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pattern_type TEXT NOT NULL,
+            pattern_key TEXT NOT NULL UNIQUE,
+            description TEXT,
+            frequency INTEGER DEFAULT 1,
+            total_opportunities INTEGER DEFAULT 1,
+            confidence REAL DEFAULT 0.0,
+            last_matched DATETIME,
+            first_seen DATETIME DEFAULT (datetime('now', 'localtime')),
+            predicted_action TEXT,
+            trigger_conditions TEXT,
+            is_active BOOLEAN DEFAULT 1,
+            user_confirmed BOOLEAN DEFAULT 0
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS anticipation_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pattern_id INTEGER,
+            suggestion_text TEXT,
+            confidence REAL,
+            suggested_at DATETIME DEFAULT (datetime('now', 'localtime')),
+            user_response TEXT DEFAULT 'pending',
+            FOREIGN KEY (pattern_id) REFERENCES action_patterns(id)
+        )
+    """)
+
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_user_actions_timestamp ON user_actions(timestamp)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_user_actions_category ON user_actions(action_category, day_of_week, hour)"
+    )
+
+    # --- Self-Healing Engine Table ---
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS tool_failure_memory (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tool_name TEXT NOT NULL,
+            error_type TEXT,
+            error_signature TEXT,
+            args_hash TEXT,
+            occurrence_count INTEGER DEFAULT 1,
+            first_seen DATETIME DEFAULT (datetime('now', 'localtime')),
+            last_seen DATETIME DEFAULT (datetime('now', 'localtime')),
+            resolution TEXT,
+            is_recurring BOOLEAN DEFAULT 0
+        )
+    """)
+
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_failure_memory_tool ON tool_failure_memory(tool_name, args_hash)"
+    )
+
     conn.commit()
     conn.close()
 

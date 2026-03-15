@@ -32,6 +32,22 @@ _init_db()
 def set_reminder(task: str, reminder_time: str, priority: str = "normal") -> str:
     """Creates a new reminder in the database."""
     try:
+        # Guard: reject reminders set in the past
+        try:
+            parsed = datetime.fromisoformat(reminder_time)
+            now = datetime.now(parsed.tzinfo or timezone.utc)
+            if parsed < now - timedelta(minutes=2):
+                minutes_ago = int((now - parsed).total_seconds() / 60)
+                return json.dumps({
+                    "error": f"Cannot set a reminder in the past. "
+                             f"The requested time ({reminder_time}) was {minutes_ago} minutes ago. "
+                             f"Please choose a future date/time.",
+                    "requested_time": reminder_time,
+                    "current_time": now.isoformat(),
+                })
+        except (ValueError, TypeError):
+            pass  # let malformed times through — the DB stores them as text anyway
+
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         c.execute(

@@ -31,11 +31,11 @@ const toolFriendlyNames = {
     create_event:         "Creating a calendar event",
     delete_event:         "Removing a calendar event",
     set_reminder:         "Setting a reminder",
-    list_reminders:       "Checking reminders",
-    dismiss_reminder:     "Clearing a reminder",
-    search_core_memory:   "Recalling from memory",
-    save_core_memory:     "Saving to memory",
-    delete_core_memory:   "Updating memory",
+    get_pending_reminders:"Checking reminders",
+    mark_reminder_completed: "Clearing a reminder",
+    search_past_conversations: "Recalling from memory",
+    save_core_fact:       "Saving to memory",
+    delete_core_fact:     "Updating memory",
     lookup_stakeholder:   "Looking up contacts",
     add_stakeholder:      "Adding a contact",
     update_stakeholder:   "Updating a contact",
@@ -43,9 +43,9 @@ const toolFriendlyNames = {
     add_bill:             "Recording a bill",
     list_bills:           "Checking bills",
     mark_bill_paid:       "Marking a bill paid",
-    list_tasks:           "Checking your tasks",
+    get_tasks:            "Checking your tasks",
     create_task:          "Creating a task",
-    complete_task:        "Completing a task",
+    update_task:          "Updating a task",
     web_search:           "Searching the web",
     fetch_webpage:        "Reading a webpage",
     call_api:             "Calling a custom API",
@@ -493,6 +493,86 @@ async function deleteContact(id) {
         if (res.ok) loadContacts();
         else alert('Failed to delete contact');
     } catch (e) { console.error(e); alert('Error deleting contact'); }
+}
+
+/* ---------- Contact Import ---------- */
+let _pendingCsvText = null;
+
+function openImportModal() {
+    _pendingCsvText = null;
+    document.getElementById('import-csv-file').value = '';
+    document.getElementById('import-preview').style.display = 'none';
+    document.getElementById('import-result').style.display = 'none';
+    document.getElementById('import-submit-btn').disabled = true;
+    const modal = new bootstrap.Modal(document.getElementById('importModal'));
+    modal.show();
+
+    document.getElementById('import-csv-file').addEventListener('change', handleCsvFile);
+}
+
+function handleCsvFile(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+        _pendingCsvText = evt.target.result;
+        const lines = _pendingCsvText.trim().split('\n');
+        if (lines.length < 2) {
+            alert('CSV must have a header row and at least one data row.');
+            return;
+        }
+
+        const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+        const previewRows = lines.slice(1, 6);
+
+        let headHtml = '<tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr>';
+        let bodyHtml = previewRows.map(row => {
+            const cols = row.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || row.split(',');
+            return '<tr>' + cols.map(c => `<td>${(c || '').replace(/^"|"$/g, '')}</td>`).join('') + '</tr>';
+        }).join('');
+
+        document.getElementById('import-preview-head').innerHTML = headHtml;
+        document.getElementById('import-preview-body').innerHTML = bodyHtml;
+        document.getElementById('import-preview-count').textContent = `(${lines.length - 1} rows found)`;
+        document.getElementById('import-preview').style.display = 'block';
+        document.getElementById('import-submit-btn').disabled = false;
+    };
+    reader.readAsText(file);
+}
+
+async function submitImport() {
+    if (!_pendingCsvText) return;
+    const btn = document.getElementById('import-submit-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Importing...';
+
+    try {
+        const res = await fetch('/api/contacts/import', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ csv: _pendingCsvText })
+        });
+        const data = await res.json();
+        const resultEl = document.getElementById('import-result');
+
+        if (data.error) {
+            resultEl.innerHTML = `<div class="alert alert-danger py-2">${data.error}</div>`;
+        } else {
+            let msg = `<strong>${data.imported}</strong> contacts imported`;
+            if (data.skipped > 0) msg += `, <strong>${data.skipped}</strong> skipped (duplicates or missing name)`;
+            if (data.errors && data.errors.length > 0) msg += `<br><small class="text-danger">${data.errors.slice(0, 3).join('<br>')}</small>`;
+            resultEl.innerHTML = `<div class="alert alert-success py-2">${msg}</div>`;
+            loadContacts();
+        }
+        resultEl.style.display = 'block';
+    } catch (e) {
+        console.error(e);
+        alert('Import failed: ' + e.message);
+    }
+
+    btn.innerHTML = '<i class="bi bi-upload me-1"></i>Import';
+    btn.disabled = false;
 }
 
 /* ---------- Custom APIs ---------- */
@@ -963,8 +1043,40 @@ async function pollChat() {
     setTimeout(pollChat, 500);
 }
 
+/* ---------- Rotating placeholder hints ---------- */
+const placeholderHints = [
+    "Ask anything... or try /remind 5pm call mom",
+    "Try: /email john about meeting: Let's sync tomorrow",
+    "Try: /cal tomorrow — instant calendar check",
+    "Try: /search latest AI news — quick web search",
+    "Try: /bill 50 electric due March 20",
+    "Try: /bills — list pending bills",
+    "Try: /reminders — see all reminders",
+    "Ask your agent anything...",
+];
+let _placeholderIdx = 0;
+
+function rotatePlaceholder() {
+    const input = document.getElementById('chat-input');
+    if (input && !input.value && document.activeElement !== input) {
+        _placeholderIdx = (_placeholderIdx + 1) % placeholderHints.length;
+        input.placeholder = placeholderHints[_placeholderIdx];
+    }
+}
+
 /* ---------- Boot ---------- */
 document.addEventListener("DOMContentLoaded", () => {
+    const chatInput = document.getElementById('chat-input');
+    if (chatInput) {
+        // Enter submits; Shift+Enter inserts a newline for multiline prompts.
+        chatInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+                e.preventDefault();
+                document.getElementById('chat-form')?.requestSubmit();
+            }
+        });
+    }
+
     initConfig();
     checkConnectionStatus();
     loadDashboard();
@@ -973,4 +1085,6 @@ document.addEventListener("DOMContentLoaded", () => {
     setInterval(updateClock, 1000);
     updateContextStats();
     setInterval(updateContextStats, 5000);
+    rotatePlaceholder();
+    setInterval(rotatePlaceholder, 5000);
 });

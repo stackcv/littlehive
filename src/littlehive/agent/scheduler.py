@@ -273,6 +273,52 @@ def _extract_email(sender: str) -> str:
     return ""
 
 
+def run_pattern_mining_job():
+    """Nightly job: mine behavioral patterns from action history."""
+    from littlehive.agent.anticipation import run_pattern_mining
+    config = get_config()
+    lookback = config.get("anticipation_mining_lookback_days", 30)
+    min_freq = config.get("anticipation_min_frequency", 3)
+    run_pattern_mining(lookback_days=lookback, min_frequency=min_freq)
+
+
+def check_anticipations_job():
+    """Periodic job: check if any learned patterns match the current moment."""
+    from littlehive.agent.anticipation import get_matching_predictions, log_anticipation
+
+    if is_user_busy():
+        return
+
+    config = get_config()
+    min_conf = config.get("anticipation_min_confidence", 0.5)
+    cooldown = config.get("anticipation_cooldown_hours", 4)
+
+    matches = get_matching_predictions(min_confidence=min_conf, cooldown_hours=cooldown)
+    if not matches:
+        return
+
+    best = max(matches, key=lambda p: p["confidence"])
+
+    log_anticipation(best["id"], best["suggestion_text"], best["confidence"])
+
+    conf_pct = int(best["confidence"] * 100)
+    inject_proactive_update([
+        f"ANTICIPATION (based on your routine, {conf_pct}% confidence): "
+        f"{best['suggestion_text']}. "
+        f"Would you like me to help with this?"
+    ])
+    logger.info(
+        f"[Anticipation] Surfaced suggestion: {best['suggestion_text']} "
+        f"(confidence={best['confidence']}, pattern_id={best['id']})"
+    )
+
+
+def process_feedback_job():
+    """Hourly job: process feedback on past anticipation suggestions."""
+    from littlehive.agent.anticipation import process_anticipation_feedback
+    process_anticipation_feedback()
+
+
 def nightly_db_cleanup():
     import sqlite3
     from littlehive.agent.paths import DB_PATH
@@ -294,6 +340,13 @@ def nightly_db_cleanup():
         logger.info("[Maintenance] Nightly DB cleanup completed.")
     except Exception as e:
         logger.error(f"[Maintenance Error] DB Cleanup: {e}")
+
+    # Clean old failure memory entries
+    try:
+        from littlehive.agent.self_healing import cleanup_old_failures
+        cleanup_old_failures(days=14)
+    except Exception as e:
+        logger.debug(f"[Maintenance] Failure memory cleanup skipped: {e}")
 
 
 def trigger_nightly_memory():
@@ -580,6 +633,30 @@ def start_proactive_scheduler(inbox, outbox_web, outbox_telegram, get_active_cha
             scheduler.add_job(trigger_morning_brief, "cron", hour=h, minute=m)
         except Exception:
             scheduler.add_job(trigger_morning_brief, "cron", hour=8, minute=0)
+
+    # --- Anticipation Engine Jobs ---
+    if config.get("anticipation_enabled", True):
+        # Nightly pattern mining at 3:30 AM (after memory extraction at 3:15)
+        scheduler.add_job(run_pattern_mining_job, "cron", hour=3, minute=30)
+
+        # Check for anticipation matches every 15 minutes
+        anticipation_interval = config.get("anticipation_check_interval_minutes", 15)
+        scheduler.add_job(
+            check_anticipations_job,
+            "interval",
+            minutes=anticipation_interval,
+            next_run_time=datetime.now() + timedelta(minutes=5),
+        )
+
+        # Process feedback hourly
+        scheduler.add_job(
+            process_feedback_job,
+            "interval",
+            minutes=60,
+            next_run_time=datetime.now() + timedelta(minutes=30),
+        )
+
+        logger.info("[Anticipation] Engine jobs scheduled (mining, prediction, feedback).")
 
     scheduler.start()
     logger.info("[Proactive] Scheduler active with advanced configuration.")

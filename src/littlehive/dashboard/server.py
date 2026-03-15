@@ -371,6 +371,66 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(response_data)
             return
 
+        elif self.path == "/api/patterns":
+            try:
+                from littlehive.agent.anticipation import get_all_patterns
+                patterns = get_all_patterns()
+                response_data = json.dumps({"patterns": patterns}).encode("utf-8")
+            except Exception as e:
+                response_data = json.dumps({"error": str(e), "patterns": []}).encode("utf-8")
+
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.send_header("Content-Length", str(len(response_data)))
+            self.end_headers()
+            self.wfile.write(response_data)
+            return
+
+        elif self.path == "/api/anticipations":
+            try:
+                from littlehive.agent.anticipation import get_anticipation_history
+                history = get_anticipation_history(limit=50)
+                response_data = json.dumps({"anticipations": history}).encode("utf-8")
+            except Exception as e:
+                response_data = json.dumps({"error": str(e), "anticipations": []}).encode("utf-8")
+
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.send_header("Content-Length", str(len(response_data)))
+            self.end_headers()
+            self.wfile.write(response_data)
+            return
+
+        elif self.path == "/api/anticipation-stats":
+            try:
+                from littlehive.agent.anticipation import get_anticipation_stats
+                stats = get_anticipation_stats()
+                response_data = json.dumps(stats).encode("utf-8")
+            except Exception as e:
+                response_data = json.dumps({"error": str(e)}).encode("utf-8")
+
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.send_header("Content-Length", str(len(response_data)))
+            self.end_headers()
+            self.wfile.write(response_data)
+            return
+
+        elif self.path == "/api/tool-failures":
+            try:
+                from littlehive.agent.self_healing import get_failure_stats
+                stats = get_failure_stats()
+                response_data = json.dumps(stats).encode("utf-8")
+            except Exception as e:
+                response_data = json.dumps({"error": str(e), "failures": [], "summary": {}}).encode("utf-8")
+
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.send_header("Content-Length", str(len(response_data)))
+            self.end_headers()
+            self.wfile.write(response_data)
+            return
+
         return super().do_GET()
 
     def do_POST(self):
@@ -436,6 +496,75 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
             except Exception as e:
                 response_data = json.dumps({"error": str(e)}).encode("utf-8")
                 self.send_response(500)
+                self.send_header("Content-type", "application/json")
+                self.send_header("Content-Length", str(len(response_data)))
+                self.end_headers()
+                self.wfile.write(response_data)
+            return
+
+        elif self.path == "/api/contacts/import":
+            content_length = int(self.headers["Content-Length"])
+            post_data = self.rfile.read(content_length)
+            try:
+                import csv
+                import io
+                data = json.loads(post_data.decode("utf-8"))
+                csv_text = data.get("csv", "")
+                if not csv_text.strip():
+                    raise ValueError("Empty CSV data")
+
+                reader = csv.DictReader(io.StringIO(csv_text))
+                # Normalise header names: lowercase, strip, map common variants
+                field_map = {
+                    "first name": "first_name", "last name": "last_name",
+                    "given name": "first_name", "family name": "last_name",
+                    "e-mail 1 - value": "email", "phone 1 - value": "phone",
+                    "e-mail address": "email", "email address": "email",
+                    "mobile phone": "phone", "primary phone": "phone",
+                    "organization 1 - name": "organization",
+                    "company": "organization", "organisation": "organization",
+                    "job title": "relationship", "title": "relationship",
+                    "notes": "preferences", "nickname": "alias",
+                }
+
+                contacts = []
+                for row in reader:
+                    norm = {}
+                    for k, v in row.items():
+                        key = (k or "").strip().lower()
+                        mapped = field_map.get(key, key.replace(" ", "_"))
+                        if v and v.strip():
+                            norm[mapped] = v.strip()
+
+                    name = norm.get("name", "")
+                    if not name:
+                        first = norm.get("first_name", "")
+                        last = norm.get("last_name", "")
+                        name = f"{first} {last}".strip()
+                    if not name:
+                        continue
+
+                    contacts.append({
+                        "name": name,
+                        "alias": norm.get("alias", ""),
+                        "email": norm.get("email", ""),
+                        "phone": norm.get("phone", ""),
+                        "telegram": norm.get("telegram", ""),
+                        "relationship": norm.get("relationship", norm.get("organization", "")),
+                        "preferences": norm.get("preferences", ""),
+                    })
+
+                from littlehive.tools.stakeholder_tools import bulk_import_contacts
+                result = bulk_import_contacts(contacts)
+                response_data = json.dumps(result).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-type", "application/json")
+                self.send_header("Content-Length", str(len(response_data)))
+                self.end_headers()
+                self.wfile.write(response_data)
+            except Exception as e:
+                response_data = json.dumps({"error": str(e)}).encode("utf-8")
+                self.send_response(400)
                 self.send_header("Content-type", "application/json")
                 self.send_header("Content-Length", str(len(response_data)))
                 self.end_headers()

@@ -245,6 +245,10 @@ def list_directory(path: str = "") -> str:
     if not ok:
         return json.dumps({"error": reason})
 
+    # Auto-create the workspace root if it doesn't exist yet
+    workspace = _get_workspace(config)
+    os.makedirs(workspace, exist_ok=True)
+
     if not os.path.isdir(resolved):
         return json.dumps({"error": f"Not a directory: {resolved}"})
 

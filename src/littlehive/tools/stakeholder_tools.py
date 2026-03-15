@@ -258,6 +258,61 @@ def get_auto_respond_contacts() -> list[dict]:
         return []
 
 
+def bulk_import_contacts(contacts: list[dict]) -> dict:
+    """Import multiple contacts at once. Each dict should have at least 'name'.
+    Skips rows missing a name. Deduplicates against existing contacts by email.
+    Returns counts of imported, skipped, and failed."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+
+    c.execute("SELECT email FROM stakeholders WHERE email IS NOT NULL AND email != ''")
+    existing_emails = {row["email"].lower() for row in c.fetchall()}
+
+    imported = 0
+    skipped = 0
+    errors = []
+
+    for i, contact in enumerate(contacts):
+        name = (contact.get("name") or "").strip()
+        if not name:
+            skipped += 1
+            continue
+
+        email = (contact.get("email") or "").strip()
+        if email and email.lower() in existing_emails:
+            skipped += 1
+            continue
+
+        try:
+            from datetime import datetime
+            c.execute(
+                """INSERT INTO stakeholders
+                   (name, alias, email, phone, telegram, relationship, preferences, date_added, auto_respond)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    name,
+                    (contact.get("alias") or "").strip(),
+                    email,
+                    (contact.get("phone") or "").strip(),
+                    (contact.get("telegram") or "").strip(),
+                    (contact.get("relationship") or "").strip(),
+                    (contact.get("preferences") or "").strip(),
+                    datetime.now().isoformat(),
+                    0,
+                ),
+            )
+            if email:
+                existing_emails.add(email.lower())
+            imported += 1
+        except Exception as e:
+            errors.append(f"Row {i + 1} ({name}): {e}")
+
+    conn.commit()
+    conn.close()
+    return {"imported": imported, "skipped": skipped, "errors": errors}
+
+
 STAKEHOLDER_TOOLS_SCHEMA = [
     {
         "type": "function",
